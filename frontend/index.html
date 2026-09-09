@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PyLearn Pro — Master Python & AI</title>
+  <!-- Google Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons & Confetti -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div class="logo-container">
+      <div class="logo-icon">🐍</div>
+      <div>
+        <div class="logo-text">PyLearn Pro</div>
+        <div style="font-size: 11px; color: var(--text-dim);">Zero to AI Engineer</div>
+      </div>
+    </div>
+
+    <ul class="nav-links">
+      <li class="nav-item active" data-view="dashboard">
+        <i data-lucide="layout-dashboard"></i>
+        <span>Daily Hub</span>
+      </li>
+      <li class="nav-item" data-view="curriculum">
+        <i data-lucide="book-open"></i>
+        <span>Curriculum Track</span>
+      </li>
+      <li class="nav-item" data-view="studio">
+        <i data-lucide="terminal"></i>
+        <span>Code Studio</span>
+      </li>
+      <li class="nav-item" data-view="flashcards">
+        <i data-lucide="layers"></i>
+        <span>Active Recall (SRS)</span>
+      </li>
+      <li class="nav-item" data-view="analytics">
+        <i data-lucide="activity"></i>
+        <span>Progress Analytics</span>
+      </li>
+    </ul>
+
+    <!-- User stats widget -->
+    <div class="sidebar-user">
+      <div class="user-level-row">
+        <span>Level <strong id="sidebar-level">1</strong></span>
+        <span class="xp-badge"><span id="sidebar-xp">0</span> XP</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="sidebar-xp-progress" style="width: 10%;"></div>
+      </div>
+      <div style="font-size: 11px; color: var(--text-dim); text-align: right;" id="sidebar-sessions-done">0 Sessions Completed</div>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <main class="main-wrapper">
+    <!-- Header -->
+    <header class="top-header">
+      <div class="header-title-group">
+        <h1 id="view-title">Daily Learning Hub</h1>
+      </div>
+      <div class="header-actions">
+        <!-- 30-min Pomodoro Timer -->
+        <div class="stat-pill timer-pill" id="session-timer-btn" title="Click to start 30m session timer">
+          <i data-lucide="clock" style="width: 16px; height: 16px;"></i>
+          <span id="session-timer-display">30:00</span>
+        </div>
+        <!-- Streak -->
+        <div class="stat-pill streak-pill">
+          <i data-lucide="flame" style="width: 16px; height: 16px;"></i>
+          <span id="streak-display">0 Day Streak</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- VIEWS -->
+
+    <!-- 1. DASHBOARD VIEW -->
+    <div class="view-container active" id="view-dashboard">
+      <div class="glass-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(129, 140, 248, 0.05));">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px;">Today's Target</div>
+            <h2 id="dash-today-title" style="font-size: 22px; font-weight: 700; margin: 6px 0 10px 0;">Day 1: Genesis — Thinking Like a Python Programmer</h2>
+            <p id="dash-today-desc" style="color: var(--text-muted); font-size: 14px; max-width: 650px;">
+              Master variables as labeled storage boxes, primitive data types, and running your first Python program.
+            </p>
+          </div>
+          <button class="btn btn-primary" id="btn-jump-today" style="padding: 12px 24px;">
+            <i data-lucide="play"></i> Start Next Session
+          </button>
+        </div>
+      </div>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 14px;">Today's 4 Micro-Sessions (2 Hours Total)</h3>
+      <div class="grid-4" id="dash-sessions-grid">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+
+    <!-- 2. CURRICULUM VIEW -->
+    <div class="view-container" id="view-curriculum">
+      <div id="curriculum-roadmap" style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+
+    <!-- 3. CODE STUDIO / LESSON RUNNER VIEW -->
+    <div class="view-container" id="view-studio">
+      <div class="editor-layout">
+        <!-- Left: Instruction & Code Editor -->
+        <div class="editor-pane">
+          <div class="pane-header">
+            <span id="editor-session-title">Interactive Python Sandbox</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ai" id="btn-ai-review" style="padding: 4px 12px; font-size: 12px;" title="Submit your code to AI Tutor for issue diagnosis & level-appropriate improvement">
+                ✨ AI Review & Refactor
+              </button>
+              <button class="btn btn-outline" id="btn-reset-code" style="padding: 4px 10px; font-size: 12px;">Reset</button>
+              <button class="btn btn-primary" id="btn-run-code" style="padding: 4px 14px; font-size: 12px;">
+                <i data-lucide="play" style="width: 14px; height: 14px;"></i> Run (Ctrl+Enter)
+              </button>
+            </div>
+          </div>
+          <div class="editor-container" id="editor-container-wrapper">
+            <div id="monaco-code-editor" style="width: 100%; height: 100%;"></div>
+            <textarea class="code-textarea" id="main-code-editor" style="display: none;" spellcheck="false"></textarea>
+          </div>
+        </div>
+
+        <!-- Right: Real-time Output & Scrollable Guidance / Breakdown / Videos -->
+        <div class="output-pane">
+          <div class="pane-header">
+            <span>Interactive Terminal & Output</span>
+            <span id="execution-time-label" style="font-size: 11px; color: var(--text-dim);">Ready</span>
+          </div>
+          
+          <!-- Live Interactive Terminal Output & Input Prompt Box -->
+          <div class="terminal-pane">
+            <div class="terminal-output" id="terminal-output">Press "Run" to execute Python code...</div>
+            <div class="terminal-prompt-bar" id="terminal-prompt-container" style="display: none;">
+              <span class="terminal-prompt-label" id="terminal-prompt-label">&gt;</span>
+              <input type="text" class="terminal-prompt-input" id="terminal-interactive-input" placeholder="Type your response and press Enter..." autocomplete="off">
+              <button class="btn btn-primary" id="btn-terminal-send" style="padding: 2px 10px; font-size: 11px;">Send ↵</button>
+            </div>
+          </div>
+          
+          <!-- Scrollable Instructions, Code Anatomy Breakdown & Video Visualizer -->
+          <div class="guidance-scroll-pane">
+            <!-- AI Tutor Analysis Box (Appears when user clicks AI Review) -->
+            <div id="ai-review-container" style="display: none;"></div>
+
+            <div>
+              <div style="font-size: 12px; font-weight: 700; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                💡 Goal & Concept Walkthrough
+              </div>
+              <div id="editor-instructions" style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
+                Write your Python code and inspect output in real time.
+              </div>
+            </div>
+
+            <div id="hints-accordion" style="font-size: 12px; color: var(--text-dim);"></div>
+
+            <button class="btn btn-success" id="btn-complete-session" style="margin-top: 10px; width: 100%; display: none;">
+              ✓ Mark Session Complete (+25 XP)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ACTIVE RECALL / FLASHCARDS VIEW -->
+    <div class="view-container" id="view-flashcards">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="font-size: 22px; font-weight: 700;">Active Recall & Spaced Repetition</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">SuperMemo-2 algorithmic memory engine</p>
+      </div>
+
+      <div class="flashcard-wrapper">
+        <div class="flashcard-inner" id="flashcard-card">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim);">
+            <span id="card-deck-name">Python Core</span>
+            <span id="card-counter">Card 1 / 1</span>
+          </div>
+
+          <div class="flashcard-question" id="card-question">
+            Loading your next active recall concept...
+          </div>
+
+          <div class="flashcard-answer" id="card-answer">
+            <!-- Answer Content -->
+          </div>
+
+          <div style="text-align: center; color: var(--primary); font-size: 13px; font-weight: 600;" id="card-flip-prompt">
+            Click anywhere on card to reveal answer ↻
+          </div>
+        </div>
+
+        <div class="flashcard-buttons" id="flashcard-rating-buttons" style="display: none;">
+          <button class="btn btn-outline" style="border-color: #ef4444; color: #ef4444;" onclick="App.rateCurrentCard(0)">Again (1d)</button>
+          <button class="btn btn-outline" style="border-color: #f59e0b; color: #f59e0b;" onclick="App.rateCurrentCard(1)">Hard (3d)</button>
+          <button class="btn btn-outline" style="border-color: #38bdf8; color: #38bdf8;" onclick="App.rateCurrentCard(2)">Good (6d)</button>
+          <button class="btn btn-outline" style="border-color: #10b981; color: #10b981;" onclick="App.rateCurrentCard(3)">Easy (12d)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. ANALYTICS VIEW -->
+    <div class="view-container" id="view-analytics">
+      <div class="grid-2" style="margin-bottom: 24px;">
+        <div class="glass-card">
+          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Learning Stats</h3>
+          <div style="display: flex; gap: 24px;">
+            <div>
+              <div style="font-size: 28px; font-weight: 700; color: var(--primary);" id="stat-xp-large">0</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Total XP Earned</div>
+            </div>
+            <div>
+              <div style="font-size: 28px; font-weight: 700; color: #fb923c;" id="stat-streak-large">0</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Day Streak</div>
+            </div>
+            <div>
+              <div style="font-size: 28px; font-weight: 700; color: var(--success);" id="stat-completed-sessions">0</div>
+              <div style="font-size: 12px; color: var(--text-muted);">Completed Sessions</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Track Specialization</h3>
+          <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Data Science & AI/ML</span>
+                <span style="color: var(--primary);">40%</span>
+              </div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 40%;"></div></div>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Automation & Scripting</span>
+                <span style="color: var(--secondary);">35%</span>
+              </div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 35%; background: var(--secondary);"></div></div>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>General Software Engineering</span>
+                <span style="color: var(--success);">25%</span>
+              </div>
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 25%; background: var(--success);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Monaco Editor AMD Loader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
