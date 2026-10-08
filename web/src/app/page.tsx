@@ -28,11 +28,13 @@ type PricingSettings = {
   payments_enabled: boolean
   monthly_payments_enabled: boolean
   full_course_payments_enabled: boolean
+  usd_kes_rate: number | null
+  usd_kes_rate_date: string | null
 }
 
 export default function HomePage() {
   const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number }>({ url: null, opacity: 28 })
-  const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false, monthly_payments_enabled: false, full_course_payments_enabled: false })
+  const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false, monthly_payments_enabled: false, full_course_payments_enabled: false, usd_kes_rate: null, usd_kes_rate_date: null })
   const [activeCategory, setActiveCategory] = useState<'all' | 'foundations' | 'data' | 'oop' | 'ai'>('all')
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -56,7 +58,7 @@ export default function HomePage() {
     void supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle().then(({ data }) => {
       if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity })
     })
-    void supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle().then(({ data }) => {
+    void supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,usd_kes_rate,usd_kes_rate_date').eq('id', true).maybeSingle().then(({ data }) => {
       if (data) setPricing(data as PricingSettings)
     })
   }, [])
@@ -371,6 +373,7 @@ export default function HomePage() {
                 KES (KSh)
               </button>
             </div>
+            {currency === 'USD' && <p className="mt-2 text-xs text-slate-500">USD is a display estimate from the CBK indicative rate{pricing.usd_kes_rate_date ? ` dated ${pricing.usd_kes_rate_date}` : ''}. Paybill charges are collected in KSh.</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

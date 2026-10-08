@@ -15,7 +15,7 @@ This status note supersedes older “completed” feature lists below. Sections 
 
 | Area | Current status |
 | --- | --- |
-| Production site | The web app is deployed at the Vercel URL above. Vercel is connected to GitHub `main`, with the project root set to `web/`. Commit `1f50601` is the current deployed version; future pushes to `main` trigger Vercel deployments. The separate raw `SESSIONS/` source folder is intentionally not committed. |
+| Production site | The web app is deployed at the Vercel URL above. Vercel is connected to GitHub `main`, with the project root set to `web/`. The current production build is based on commit `b4f4458`; future pushes to `main` trigger Vercel deployments. The separate raw `SESSIONS/` source folder is intentionally not committed. |
 | Authentication | Supabase sign-up, sign-in, password recovery, and reset routes exist. Password recovery has encountered Supabase rate limiting and still needs a successful end-to-end email check. |
 | Account profile | A profile page now shows email, role, XP, and current streak; learners can edit their display name. Avatar actions include profile and sign-out. |
 | Student learning | Dashboard, Python browser editor, AI help, quick checks, saved lesson completion, and XP are implemented. Running arbitrary code in the browser does not produce a trusted grade or assignment score. |
@@ -23,21 +23,21 @@ This status note supersedes older “completed” feature lists below. Sections 
 | Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Admin hero image controls are live and can be tested. |
 | Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
 | Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
-| Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins can manage monthly/full-course charges in KSh and display prices separately in USD; full-course savings are calculated from regular minus sale price. Migration 010 adds the admin pricing controls and must be applied/deployed before they are available. This is not an automated M-Pesa integration. |
-| Admission and guardian consent | Implemented in migration 011 and the web app. Migrations 010 and 011 are applied, and commit `7e5cbdb` has been pushed to `main`. Vercel already has `RESEND_API_KEY` and `OTP_FROM_EMAIL`, which admission email delivery can reuse. The support email is `cokoth95@gmail.com`; Terms and Privacy still need an owner review. |
+| Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins set KSh prices; USD display prices are derived from the CBK daily indicative USD/KSh rate, rounded to whole dollars. Migration 012 and a Vercel production deployment are required to activate daily refresh. Paybill charges remain in KSh; this is not an automated M-Pesa integration. |
+| Admission and guardian consent | Implemented in migration 011 and the web app. Migrations 010 and 011 are applied. Vercel has email delivery configuration, which admission email delivery can reuse. The support email is `cokoth95@gmail.com`; Terms and Privacy still need an owner review. |
 | Capstones and certificates | Still planned. The app does not yet provide complete capstone submission/unlock flows or certificate creation and verification. |
-| Database updates | Migrations 001–009 are applied to the linked Supabase project. Migrations 010 and 011 are local and still need to be applied in order. |
-| Verification | Local and Vercel production builds succeeded. The new profile, hero image, and streak interactions still need owner testing with signed-in accounts. |
+| Database updates | Migrations 001–011 are applied to the linked Supabase project. Migration 012 adds CBK exchange-rate tracking and must be applied before deploying this pricing update. |
+| Verification | The production build succeeds with the daily exchange-rate route and pricing UI. The new profile, hero image, streak, and staff interactions still need owner testing with signed-in accounts. |
 
 ### Manual payment and pricing flow
 
 - Learners use `/payments` to see the Paybill instructions, select a published course and access option, and submit the last four receipt characters plus payer phone number. The app never asks for an M-Pesa PIN.
 - Payment requests are private to the learner and admin. Learners cannot set the amount, course owner, target month, or status directly; a database RPC reads the current KSh sale price and sets the amount and target month.
-- The landing page and learner payment page read the same admin-managed Supabase price record. Admins set USD and KSh prices separately; M-Pesa charges always use the saved KSh amount. Full-course savings are calculated from regular price minus sale price, and monthly access has no discount.
+- The landing page and learner payment page read the same admin-managed Supabase price record. Admins set KSh prices; a database trigger derives display-only USD prices from the saved CBK rate at the rate date and rounds to whole dollars. A daily Vercel cron refreshes this rate; if refresh fails, the last saved rate and converted prices remain. USD prices are estimates, while Paybill charges always use KSh. Full-course savings are calculated from regular price minus sale price.
 - Admins review requests in the Admin panel’s **Payments** section. Confirming grants either full-course access or access to the next unpurchased paid month for 30 days from confirmation. Declining requires a learner-visible reason; the request stays in history and can be resubmitted.
 - Payments default to disabled. Admins may disable new requests while still reviewing pending requests; existing access is unchanged. The only payment destination is KCB Paybill `522522`, account `1288171692`.
 - Month-specific entitlements are checked by both module row-level security and the quick-check grading RPC. Previously saved progress remains in the learner account when a 30-day entitlement expires.
-- Before using the pricing controls: apply `web/supabase/migrations/010_admin_managed_pricing.sql` and deploy the update. Test with learner/admin accounts; do not confirm a request unless the corresponding M-Pesa message is visible to the administrator.
+- Before using the pricing controls: apply migration `012_cbk_daily_exchange_rate.sql`, deploy the update, and add a sensitive `CRON_SECRET` Vercel production environment variable so the scheduled refresh route is authorized. Admins can also use **Refresh rate now**. Test with learner/admin accounts; do not confirm a request unless the corresponding M-Pesa message is visible to the administrator.
 
 ### Admission guide and under-18 access
 

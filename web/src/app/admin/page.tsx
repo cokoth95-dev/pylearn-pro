@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
-import { BookOpen, CheckCircle2, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CheckCircle2, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, RefreshCw, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 
 type Course = { id: string; slug: string; title: string; language_code: string; description: string; status: 'draft' | 'published' | 'archived' }
 type Module = { id: number; course_id: string; month_number: number; title: string; tagline: string | null; description: string | null; is_free: boolean; order_index: number; status: 'draft' | 'published' | 'archived' }
@@ -18,7 +18,7 @@ type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'pa
 type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number }
 type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
 type PaymentPricing = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number }
-type PaymentSettings = PaymentPricing & { payments_enabled: boolean; monthly_payments_enabled: boolean; full_course_payments_enabled: boolean; paybill_number: string; account_number: string }
+type PaymentSettings = PaymentPricing & { payments_enabled: boolean; monthly_payments_enabled: boolean; full_course_payments_enabled: boolean; paybill_number: string; account_number: string; usd_kes_rate: number | null; usd_kes_rate_date: string | null; usd_kes_rate_source: string | null }
 type AdmissionDocument = { version: number; title: string; content_markdown: string; requires_reacceptance: boolean; published_at: string }
 
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
@@ -68,7 +68,7 @@ export default function AdminPage() {
       supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
       supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle(),
-      supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle(),
+      supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,usd_kes_rate,usd_kes_rate_date,usd_kes_rate_source').eq('id', true).maybeSingle(),
       supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
       supabase.from('admission_document_versions').select('version,title,content_markdown,requires_reacceptance,published_at').order('version', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('admission_document_draft').select('title,content_markdown').eq('id', true).maybeSingle(),
@@ -250,11 +250,24 @@ export default function AdminPage() {
   async function savePaymentPricing(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!paymentPricingDraft) return
-    if (paymentPricingDraft.full_course_regular_amount_kes < paymentPricingDraft.full_course_amount_kes || paymentPricingDraft.full_course_regular_amount_usd < paymentPricingDraft.full_course_amount_usd) {
-      setErrorMessage('The full-course regular price must be at least as high as its sale price in both currencies.')
+    if (paymentPricingDraft.full_course_regular_amount_kes < paymentPricingDraft.full_course_amount_kes) {
+      setErrorMessage('The full-course regular KSh price must be at least as high as its sale price.')
       return
     }
-    await perform(async () => await supabase.from('payment_settings').update({ ...paymentPricingDraft, updated_at: new Date().toISOString() }).eq('id', true), 'Pricing saved. Public price cards and learner Paybill options now use these amounts.')
+    await perform(async () => await supabase.from('payment_settings').update({ monthly_amount_kes: paymentPricingDraft.monthly_amount_kes, full_course_amount_kes: paymentPricingDraft.full_course_amount_kes, full_course_regular_amount_kes: paymentPricingDraft.full_course_regular_amount_kes, updated_at: new Date().toISOString() }).eq('id', true), 'KSh prices saved. USD display prices are calculated from the current CBK rate.')
+  }
+
+  async function refreshExchangeRate() {
+    setBusy(true); setMessage(''); setErrorMessage('')
+    try {
+      const response = await fetch('/api/exchange-rate', { method: 'POST' })
+      const result = await response.json() as { error?: string }
+      if (!response.ok) throw new Error(result.error ?? 'The exchange rate could not be refreshed.')
+      setMessage('The latest CBK indicative rate was saved. USD prices have been recalculated.')
+      await loadData()
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'The exchange rate could not be refreshed. The previous saved rate is still in use.')
+    } finally { setBusy(false) }
   }
 
   async function saveAdmissionDraft() {
@@ -381,19 +394,26 @@ export default function AdminPage() {
               <PlanToggle title="Monthly access" description="Enable only when the next paid month has published lessons. The database checks availability when a learner submits." enabled={paymentSettings.monthly_payments_enabled} busy={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ monthly_payments_enabled: !paymentSettings.monthly_payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.monthly_payments_enabled ? 'Monthly access requests disabled.' : 'Monthly access requests enabled.')}/>
               <PlanToggle title="Full-course access" description="Enable only after all paid months are published. The database checks published course content before it accepts a request." enabled={paymentSettings.full_course_payments_enabled} busy={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ full_course_payments_enabled: !paymentSettings.full_course_payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.full_course_payments_enabled ? 'Full-course requests disabled.' : 'Full-course requests enabled.')}/>
             </section>
-            {paymentPricingDraft && <form onSubmit={savePaymentPricing} className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Public and learner prices</h3><p className="mt-1 text-xs leading-5 text-stone-600">Set USD and KSh values separately. KSh prices are used for Paybill requests; USD is display-only. Full-course savings is calculated from regular price minus sale price. Monthly pricing has no discount.</p></div>
+            {paymentPricingDraft && <form onSubmit={savePaymentPricing} className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Public and learner prices</h3><p className="mt-1 text-xs leading-5 text-stone-600">Set prices in KSh. USD is calculated from the daily CBK indicative rate and rounded to the nearest dollar. KSh is used for Paybill requests. Full-course savings are calculated from the regular price minus the sale price.</p></div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-stone-50 p-4"><div><p className="text-sm font-semibold">Daily USD/KSh exchange rate</p><p className="mt-1 text-xs text-stone-600">{paymentSettings?.usd_kes_rate && paymentSettings.usd_kes_rate_date ? `1 USD = KSh ${Number(paymentSettings.usd_kes_rate).toFixed(4)} · Rate date ${paymentSettings.usd_kes_rate_date} · ${paymentSettings.usd_kes_rate_source ?? 'CBK indicative rate'}` : 'No CBK rate has been saved yet. USD displays will update after the first successful refresh.'}</p><p className="mt-1 text-xs text-stone-500">The daily Vercel schedule refreshes automatically. If the source is unavailable, the last saved rate stays active.</p></div><button type="button" disabled={busy} onClick={() => void refreshExchangeRate()} className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-white disabled:opacity-50"><RefreshCw className="mr-2 inline h-4 w-4"/>Refresh rate now</button></div>
               <div className="grid gap-5 md:grid-cols-2">
                 {(['KES', 'USD'] as const).map((currency) => {
                   const keys = currency === 'KES'
                     ? { monthly: 'monthly_amount_kes', sale: 'full_course_amount_kes', regular: 'full_course_regular_amount_kes' } as const
                     : { monthly: 'monthly_amount_usd', sale: 'full_course_amount_usd', regular: 'full_course_regular_amount_usd' } as const
                   const symbol = currency === 'KES' ? 'KSh' : '$'
-                  const step = currency === 'KES' ? '1' : '0.01'
+                  const step = '1'
+                  const kesValue = (key: 'monthly_amount_kes' | 'full_course_amount_kes' | 'full_course_regular_amount_kes') => Number(paymentPricingDraft[key])
+                  const usdValue = (key: 'monthly_amount_kes' | 'full_course_amount_kes' | 'full_course_regular_amount_kes', fallback: 'monthly_amount_usd' | 'full_course_amount_usd' | 'full_course_regular_amount_usd') => paymentSettings?.usd_kes_rate ? Math.round(kesValue(key) / Number(paymentSettings.usd_kes_rate)) : Number(paymentPricingDraft[fallback])
+                  const values = currency === 'KES'
+                    ? { monthly: kesValue('monthly_amount_kes'), sale: kesValue('full_course_amount_kes'), regular: kesValue('full_course_regular_amount_kes') }
+                    : { monthly: usdValue('monthly_amount_kes', 'monthly_amount_usd'), sale: usdValue('full_course_amount_kes', 'full_course_amount_usd'), regular: usdValue('full_course_regular_amount_kes', 'full_course_regular_amount_usd') }
+                  const usdReadOnly = currency === 'USD'
                   return <fieldset key={currency} className="space-y-3 rounded-xl border border-stone-200 p-4"><legend className="px-1 text-sm font-bold">{currency === 'KES' ? 'Kenyan shillings (M-Pesa currency)' : 'US dollars (display only)'}</legend>
-                    <label className="block text-xs font-semibold">Monthly price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.monthly]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.monthly]: Number(event.target.value) } : current)}/></label>
-                    <label className="block text-xs font-semibold">Full-course sale price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.sale]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.sale]: Number(event.target.value) } : current)}/></label>
-                    <label className="block text-xs font-semibold">Full-course regular price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.regular]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.regular]: Number(event.target.value) } : current)}/></label>
-                    <p className="text-xs text-stone-500">Displayed saving: {symbol} {Math.max(0, Number(paymentPricingDraft[keys.regular]) - Number(paymentPricingDraft[keys.sale])).toLocaleString(currency === 'KES' ? 'en-KE' : 'en-US', { maximumFractionDigits: currency === 'KES' ? 0 : 2 })}</p>
+                    <label className="block text-xs font-semibold">Monthly price ({symbol})<input type="number" min="1" step={step} required readOnly={usdReadOnly} className={`${inputClass} mt-1 ${usdReadOnly ? 'bg-stone-100' : ''}`} value={values.monthly} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.monthly]: Number(event.target.value) } : current)}/></label>
+                    <label className="block text-xs font-semibold">Full-course sale price ({symbol})<input type="number" min="1" step={step} required readOnly={usdReadOnly} className={`${inputClass} mt-1 ${usdReadOnly ? 'bg-stone-100' : ''}`} value={values.sale} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.sale]: Number(event.target.value) } : current)}/></label>
+                    <label className="block text-xs font-semibold">Full-course regular price ({symbol})<input type="number" min="1" step={step} required readOnly={usdReadOnly} className={`${inputClass} mt-1 ${usdReadOnly ? 'bg-stone-100' : ''}`} value={values.regular} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.regular]: Number(event.target.value) } : current)}/></label>
+                    <p className="text-xs text-stone-500">Displayed saving: {symbol} {Math.max(0, values.regular - values.sale).toLocaleString(currency === 'KES' ? 'en-KE' : 'en-US')}</p>
                   </fieldset>
                 })}
               </div>
