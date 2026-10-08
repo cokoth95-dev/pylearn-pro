@@ -174,6 +174,41 @@
   color: #263238 !important;
 }
 
+/* Keep hero text and controls readable over uploaded photos, GIFs, and videos. */
+:root[data-theme="light"] .landing-page .hero-copy-panel {
+  background: rgb(255 254 250 / 96%);
+  border-color: rgb(71 85 105 / 28%);
+  box-shadow: 0 20px 55px rgb(30 41 59 / 18%);
+}
+
+:root[data-theme="light"] .landing-page .hero-academy-badge {
+  background: #f3eee3;
+  border-color: #c9bfae;
+}
+
+:root[data-theme="light"] .landing-page .hero-secondary-action {
+  color: #263238 !important;
+  background: #fffefa;
+  border-color: #78858c;
+  box-shadow: 0 2px 8px rgb(30 41 59 / 10%);
+}
+
+:root[data-theme="light"] .landing-page .hero-secondary-action:hover {
+  background: #f1ede4;
+  border-color: #4b5b63;
+}
+
+:root[data-theme="light"] .landing-page .hero-pathway-option:not(.bg-amber-400) {
+  color: #33434a !important;
+  background: #fffefa;
+  border-color: #a7b0b3;
+}
+
+:root[data-theme="light"] .landing-page .hero-pathway-option:not(.bg-amber-400):hover {
+  background: #f1ede4;
+  border-color: #68777d;
+}
+
 .pill-card {
   border-radius: 9999px;
   overflow: hidden;

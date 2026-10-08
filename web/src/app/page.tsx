@@ -188,8 +188,8 @@ export default function HomePage() {
 
         <div className="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Column */}
-          <div className="lg:col-span-6 space-y-6 text-left">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-amber-300 text-xs font-bold tracking-wide">
+          <div className="lg:col-span-6 space-y-6 text-left hero-copy-panel rounded-3xl border border-white/10 bg-slate-950/70 p-5 shadow-2xl backdrop-blur-md sm:p-7">
+            <div className="hero-academy-badge inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-amber-300 text-xs font-bold tracking-wide">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Zero-Experience Python Online Academy</span>
             </div>
@@ -214,7 +214,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/register"
-                className="px-8 py-4 text-sm font-bold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition"
+                className="hero-secondary-action px-8 py-4 text-sm font-bold text-slate-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition"
               >
                 Registration
               </Link>
@@ -222,7 +222,7 @@ export default function HomePage() {
 
             {/* Category Selector */}
             <div className="pt-8 space-y-3">
-              <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">
+              <div className="hero-pathway-label text-xs font-extrabold uppercase tracking-widest text-slate-400">
                 Choose Your Pathway
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -230,7 +230,7 @@ export default function HomePage() {
                   <button
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
-                    className={`px-4 py-2 rounded-xl transition cursor-pointer capitalize ${
+                    className={`hero-pathway-option px-4 py-2 rounded-xl transition cursor-pointer capitalize ${
                       activeCategory === cat
                         ? 'bg-amber-400 text-slate-950 font-bold'
                         : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/5'
