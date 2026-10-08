@@ -99,7 +99,7 @@ export function buildAdmissionPdf(title: string, content: string, version: numbe
 
 export async function sendAdmissionEmail(to: string, subject: string, html: string, pdf: Buffer, filename: string) {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.RESEND_FROM_EMAIL
+  const from = process.env.RESEND_FROM_EMAIL || process.env.OTP_FROM_EMAIL
   if (!apiKey || !from) return { sent: false, reason: 'Email delivery is not configured yet.' }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',

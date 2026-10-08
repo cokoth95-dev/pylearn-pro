@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-const support = process.env.NEXT_PUBLIC_SUPPORT_EMAIL
+const support = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'cokoth95@gmail.com'
 
 export default function PrivacyPage() {
   return <main className="min-h-screen bg-[#faf7f0] px-4 py-10 text-stone-900"><article className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-9"><Link href="/" className="font-bold text-emerald-800">PyLearn Pro</Link><p className="mt-5 text-xs font-bold uppercase tracking-wider text-emerald-800">Your information</p><h1 className="mt-1 text-3xl font-extrabold">Privacy Notice</h1><p className="mt-2 text-xs text-stone-500">Last updated: 8 October 2026</p>
