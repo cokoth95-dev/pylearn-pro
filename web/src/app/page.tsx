@@ -373,7 +373,7 @@ export default function HomePage() {
                 KES (KSh)
               </button>
             </div>
-            {currency === 'USD' && <p className="mt-2 text-xs text-slate-500">USD is a display estimate from the CBK indicative rate{pricing.usd_kes_rate_date ? ` dated ${pricing.usd_kes_rate_date}` : ''}. Paybill charges are collected in KSh.</p>}
+            {currency === 'USD' && <p className="mt-2 text-xs text-slate-500">{pricing.usd_kes_rate_date ? `USD is a display estimate from the CBK indicative rate dated ${pricing.usd_kes_rate_date}.` : 'USD display is awaiting its first CBK rate refresh.'} Paybill charges are collected in KSh.</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

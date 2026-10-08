@@ -23,11 +23,11 @@ This status note supersedes older “completed” feature lists below. Sections 
 | Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Admin hero image controls are live and can be tested. |
 | Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
 | Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
-| Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins set KSh prices; USD display prices are derived from the CBK daily indicative USD/KSh rate, rounded to whole dollars. Migration 012 and a Vercel production deployment are required to activate daily refresh. Paybill charges remain in KSh; this is not an automated M-Pesa integration. |
+| Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins set KSh prices; USD display prices are derived from the CBK daily indicative USD/KSh rate, rounded to whole dollars. Migration 012 is applied, and commit `a4ba8a1` deploys the daily refresh. Admin must refresh the initial rate once. Paybill charges remain in KSh; this is not an automated M-Pesa integration. |
 | Admission and guardian consent | Implemented in migration 011 and the web app. Migrations 010 and 011 are applied. Vercel has email delivery configuration, which admission email delivery can reuse. The support email is `cokoth95@gmail.com`; Terms and Privacy still need an owner review. |
 | Capstones and certificates | Still planned. The app does not yet provide complete capstone submission/unlock flows or certificate creation and verification. |
-| Database updates | Migrations 001–011 are applied to the linked Supabase project. Migration 012 adds CBK exchange-rate tracking and must be applied before deploying this pricing update. |
-| Verification | The production build succeeds with the daily exchange-rate route and pricing UI. The new profile, hero image, streak, and staff interactions still need owner testing with signed-in accounts. |
+| Database updates | Migrations 001–012 are applied to the linked Supabase project. |
+| Verification | The local production build succeeds. Production commit `a4ba8a1` is Ready, and the live rate endpoint rejects unauthenticated requests. The admin must load the first rate; the daily schedule updates it afterward. |
 
 ### Manual payment and pricing flow
 
@@ -37,7 +37,7 @@ This status note supersedes older “completed” feature lists below. Sections 
 - Admins review requests in the Admin panel’s **Payments** section. Confirming grants either full-course access or access to the next unpurchased paid month for 30 days from confirmation. Declining requires a learner-visible reason; the request stays in history and can be resubmitted.
 - Payments default to disabled. Admins may disable new requests while still reviewing pending requests; existing access is unchanged. The only payment destination is KCB Paybill `522522`, account `1288171692`.
 - Month-specific entitlements are checked by both module row-level security and the quick-check grading RPC. Previously saved progress remains in the learner account when a 30-day entitlement expires.
-- Before using the pricing controls: apply migration `012_cbk_daily_exchange_rate.sql`, deploy the update, and add a sensitive `CRON_SECRET` Vercel production environment variable so the scheduled refresh route is authorized. Admins can also use **Refresh rate now**. Test with learner/admin accounts; do not confirm a request unless the corresponding M-Pesa message is visible to the administrator.
+- Before using the pricing controls: as Admin, open Payments and select **Refresh rate now** once to load the first CBK rate. The protected Vercel schedule then refreshes daily; a failed source request preserves the last rate. Do not confirm a payment unless the corresponding M-Pesa message is visible to the administrator.
 
 ### Admission guide and under-18 access
 
