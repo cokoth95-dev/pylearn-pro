@@ -24,8 +24,9 @@ This status note supersedes older “completed” feature lists below. Sections 
 | Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
 | Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
 | Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins can manage monthly/full-course charges in KSh and display prices separately in USD; full-course savings are calculated from regular minus sale price. Migration 010 adds the admin pricing controls and must be applied/deployed before they are available. This is not an automated M-Pesa integration. |
+| Admission and guardian consent | Implemented locally in migration 011 and the web app, but not deployed. It adds a versioned first-login guide, required learner acknowledgments, a profile PDF copy, Resend email delivery, an under-18 guardian email/link gate, and payment-plan publishing checks. Requires migrations 010 and 011, Resend configuration, and a final owner review of Terms, Privacy, and support contact details. |
 | Capstones and certificates | Still planned. The app does not yet provide complete capstone submission/unlock flows or certificate creation and verification. |
-| Database updates | Migrations 001–009 are applied to the linked Supabase project. |
+| Database updates | Migrations 001–009 are applied to the linked Supabase project. Migrations 010 and 011 are local and still need to be applied in order. |
 | Verification | Local and Vercel production builds succeeded. The new profile, hero image, and streak interactions still need owner testing with signed-in accounts. |
 
 ### Manual payment and pricing flow
@@ -37,6 +38,17 @@ This status note supersedes older “completed” feature lists below. Sections 
 - Payments default to disabled. Admins may disable new requests while still reviewing pending requests; existing access is unchanged. The only payment destination is KCB Paybill `522522`, account `1288171692`.
 - Month-specific entitlements are checked by both module row-level security and the quick-check grading RPC. Previously saved progress remains in the learner account when a 30-day entitlement expires.
 - Before using the pricing controls: apply `web/supabase/migrations/010_admin_managed_pricing.sql` and deploy the update. Test with learner/admin accounts; do not confirm a request unless the corresponding M-Pesa message is visible to the administrator.
+
+### Admission guide and under-18 access
+
+- Migration `011_admission_documents.sql` depends on migration 010. It stores versioned guide copies, learner acknowledgments, the fee snapshot accepted, and hashed one-time guardian tokens.
+- On first verified login, adult learners provide any missing age information, read the current guide, check both required boxes, and submit. Their dashboard and lessons stay locked until then; Profile, Payments, and sign-out remain available.
+- Under-18 learners provide a guardian name and email at registration. After email verification and sign-in, the learner requests a one-time guardian link. The guardian reviews the guide, checks the confirmation box, and submits; the learner then accepts their own copy. Guardian links expire after seven days and are single-use.
+- Admins can edit a draft and publish a numbered guide version in Admin → Admission guide. Marking a version major requires existing learners to accept it again and minors’ guardians to confirm the new version. Current and accepted guide copies are retained.
+- Monthly and full-course requests default to disabled. Admins can enable each plan only when relevant paid modules are published; the payment RPC checks curriculum availability as well as the switches.
+- PDF email delivery needs `RESEND_API_KEY` and `RESEND_FROM_EMAIL` set in Vercel and locally where applicable. Use a verified Resend sender/domain. If email sending fails, the learner’s saved PDF remains downloadable from Profile; guardian consent cannot proceed until their email is delivered.
+- Before launch, the owner must provide the school support email and review the draft Terms of Use and Privacy Notice, including retention, contact, and payment-dispute wording. These pages are product drafts, not legal advice.
+- The signup form collects age in years and guardian contact details for minors. The account remains locked until guardian confirmation and learner acceptance. This flow should be reviewed against current Kenyan child-data requirements before public launch.
 
 The owner confirmed that `cokoth95@gmail.com` can sign in with Admin access and switch to the learner view. Password recovery verification is intentionally deferred for now. The owner will test instructor and learner workflows and report back.
 

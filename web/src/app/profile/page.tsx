@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { visibleStreak } from '@/lib/learning-streak'
 
 type Profile = { full_name: string; xp: number; streak_count: number; last_activity_date: string | null; role: 'student' | 'instructor' | 'admin' }
+type AdmissionCopy = { id: string; document_version: number; document_title: string; accepted_at: string; fee_snapshot: Record<string, number | boolean> }
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
 
 export default function ProfilePage() {
@@ -21,6 +22,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [admissionCopies, setAdmissionCopies] = useState<AdmissionCopy[]>([])
+  const [emailingCopy, setEmailingCopy] = useState('')
 
   useEffect(() => {
     let active = true
@@ -28,7 +31,10 @@ export default function ProfilePage() {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) { window.location.assign('/login'); return }
       setUserId(user.id)
-      const { data, error: profileError } = await supabase.from('profiles').select('full_name,xp,streak_count,last_activity_date,role').eq('id', user.id).maybeSingle()
+      const [{ data, error: profileError }, copiesResult] = await Promise.all([
+        supabase.from('profiles').select('full_name,xp,streak_count,last_activity_date,role').eq('id', user.id).maybeSingle(),
+        supabase.from('admission_acceptances').select('id,document_version,document_title,accepted_at,fee_snapshot').eq('learner_id', user.id).order('accepted_at', { ascending: false }),
+      ])
       if (!active) return
       if (profileError || !data) setError(profileError?.message ?? 'Your profile could not be found.')
       else {
@@ -36,6 +42,7 @@ export default function ProfilePage() {
         setName(data.full_name ?? '')
         setEmail(user.email ?? '')
       }
+      if (copiesResult.data) setAdmissionCopies(copiesResult.data as AdmissionCopy[])
       setLoading(false)
     })()
     return () => { active = false }
@@ -51,6 +58,17 @@ export default function ProfilePage() {
     if (saveError) setError('We could not save your name. Please try again.')
     else { setName(cleanName); setProfile({ ...profile, full_name: cleanName }); setMessage('Your profile was saved.') }
     setSaving(false)
+  }
+
+  async function emailAdmissionCopy(copyId: string) {
+    setEmailingCopy(copyId); setError(''); setMessage('')
+    try {
+      const response = await fetch('/api/admission/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acceptanceId: copyId }) })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? 'The PDF could not be emailed.')
+      setMessage('A new PDF copy has been emailed to your sign-in address.')
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'The PDF could not be emailed.') }
+    finally { setEmailingCopy('') }
   }
 
   return <main className="min-h-screen bg-[#faf7f0] text-stone-900">
@@ -70,6 +88,12 @@ export default function ProfilePage() {
         {profile && <div className="grid gap-3 sm:grid-cols-3"><ReadOnlyStat label="Account type" value={profile.role}/><ReadOnlyStat label="XP earned" value={String(profile.xp)}/><ReadOnlyStat label="Current learning streak" value={`${visibleStreak(profile.streak_count, profile.last_activity_date)} days`}/></div>}
         <button disabled={saving || !profile} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"><Save className="h-4 w-4"/>{saving ? 'Saving…' : 'Save profile'}</button>
       </form>}
+      {!loading && <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm"><h2 className="text-lg font-bold">Admission documents</h2><p className="mt-1 text-sm text-stone-600">Your accepted guide and the fee snapshot saved at that time.</p><div className="mt-4 divide-y divide-stone-100">{admissionCopies.map((copy) => {
+        const monthly = Number(copy.fee_snapshot.monthly_amount_kes ?? 0)
+        const full = Number(copy.fee_snapshot.full_course_amount_kes ?? 0)
+        const regular = Number(copy.fee_snapshot.full_course_regular_amount_kes ?? 0)
+        return <article key={copy.id} className="flex flex-wrap items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"><div><h3 className="font-semibold">{copy.document_title}</h3><p className="mt-1 text-xs text-stone-500">Version {copy.document_version} · Accepted {new Date(copy.accepted_at).toLocaleString()} · Monthly KSh {monthly.toLocaleString()} · Full-course sale KSh {full.toLocaleString()} (regular KSh {regular.toLocaleString()})</p></div><div className="flex gap-2"><a href={`/api/admission/${copy.id}/pdf`} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-50">Download PDF</a><button disabled={emailingCopy === copy.id} onClick={() => void emailAdmissionCopy(copy.id)} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{emailingCopy === copy.id ? 'Sending…' : 'Email PDF again'}</button></div></article>
+      })}{admissionCopies.length === 0 && <p className="py-4 text-sm text-stone-500">No admission document has been accepted yet.</p>}</div></section>}
     </section>
   </main>
 }

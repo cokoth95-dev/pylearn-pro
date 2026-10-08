@@ -42,7 +42,13 @@ export async function updateSession(request: NextRequest) {
     path === '/admin' ||
     path.startsWith('/admin/') ||
     path === '/classroom' ||
-    path.startsWith('/classroom/')
+    path.startsWith('/classroom/') ||
+    path === '/instructor' ||
+    path.startsWith('/instructor/') ||
+    path === '/guardian-pending' ||
+    path.startsWith('/guardian-pending/') ||
+    path === '/admission' ||
+    path.startsWith('/admission/')
 
   if (isProtected && !claims) {
     const loginUrl = request.nextUrl.clone()
@@ -62,6 +68,26 @@ export async function updateSession(request: NextRequest) {
       dashboardUrl.pathname = '/dashboard'
       dashboardUrl.search = ''
       return NextResponse.redirect(dashboardUrl)
+    }
+  }
+
+  const learningRoute = path === '/dashboard' || path.startsWith('/dashboard/') || path === '/classroom' || path.startsWith('/classroom/') || path === '/instructor' || path.startsWith('/instructor/')
+  if (learningRoute && claims?.sub && typeof claims.sub === 'string') {
+    const { data: gateData } = await supabase.rpc('get_my_admission_gate')
+    const gate = gateData as { role?: string; age_missing?: boolean; guardian_pending?: boolean; needs_acceptance?: boolean } | null
+    if (gate?.role === 'student') {
+      if (gate.guardian_pending) {
+        const guardianUrl = request.nextUrl.clone()
+        guardianUrl.pathname = '/guardian-pending'
+        guardianUrl.search = ''
+        return NextResponse.redirect(guardianUrl)
+      }
+      if (gate.age_missing || gate.needs_acceptance) {
+        const admissionUrl = request.nextUrl.clone()
+        admissionUrl.pathname = '/admission'
+        admissionUrl.search = ''
+        return NextResponse.redirect(admissionUrl)
+      }
     }
   }
 

@@ -26,11 +26,13 @@ type PricingSettings = {
   full_course_amount_usd: number
   full_course_regular_amount_usd: number
   payments_enabled: boolean
+  monthly_payments_enabled: boolean
+  full_course_payments_enabled: boolean
 }
 
 export default function HomePage() {
   const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number }>({ url: null, opacity: 28 })
-  const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false })
+  const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false, monthly_payments_enabled: false, full_course_payments_enabled: false })
   const [activeCategory, setActiveCategory] = useState<'all' | 'foundations' | 'data' | 'oop' | 'ai'>('all')
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -54,7 +56,7 @@ export default function HomePage() {
     void supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle().then(({ data }) => {
       if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity })
     })
-    void supabase.from('payment_settings').select('payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle().then(({ data }) => {
+    void supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle().then(({ data }) => {
       if (data) setPricing(data as PricingSettings)
     })
   }, [])
@@ -117,7 +119,7 @@ export default function HomePage() {
     },
     {
       q: "What payment methods are supported for unlocking Months 2 through 4?",
-      a: "Online payment is not enabled yet. Paid course access will open after payment options and account verification are ready."
+      a: "Paid course payments open only when the relevant paid lessons are published. The Payments page shows which options are currently available."
     },
     {
       q: "What happens if my code gets stuck on an assignment?",
@@ -276,7 +278,7 @@ export default function HomePage() {
               The 4-Month <span className="text-sky-400">Milestone-Gated Roadmap</span>
             </h2>
             <p className="text-slate-400 text-sm mt-2">
-              Each week unlocks automatically only when you pass the automated test cases and capstone assignment.
+              This is the planned four-month pathway. Only lessons that have been published are available; weekly capstone assessment is still being prepared.
             </p>
           </div>
 
@@ -327,7 +329,7 @@ export default function HomePage() {
                 <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <Award className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="text-slate-400">Capstone:</span>
+                    <span className="text-slate-400">Planned project:</span>
                     <strong className="text-white">{m.capstone}</strong>
                   </div>
                 </div>
@@ -348,7 +350,7 @@ export default function HomePage() {
               Start Free Today. <span className="text-amber-400">Pay As You Master.</span>
             </h2>
             <p className="text-slate-400 text-sm mt-2">
-              Month 1 is free. {pricing.payments_enabled ? 'Pay by M-Pesa Paybill after creating your learner account.' : 'New payment requests are currently paused.'}
+              Month 1 is free. {pricing.payments_enabled && (pricing.monthly_payments_enabled || pricing.full_course_payments_enabled) ? 'Available paid plans can be paid by M-Pesa Paybill after creating your learner account.' : 'Paid plans are currently unavailable while paid lessons are being prepared.'}
             </p>
 
             <div className="mt-8 inline-flex items-center p-1 rounded-2xl bg-[#0d1117] border border-white/10">
@@ -383,10 +385,10 @@ export default function HomePage() {
                   <span className="text-xs text-slate-500">/ forever free</span>
                 </div>
                 <ul className="mt-6 space-y-2.5 text-xs text-slate-300">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Full Month 1 Classroom Access</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Access to published Month 1 lessons</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> In-Browser Pyodide Code Sandbox</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Google Gemini AI Socratic Tutoring</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Capstone 1: Budget Auditor</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Quick checks and saved lesson progress</li>
                 </ul>
               </div>
               <Link
@@ -418,12 +420,7 @@ export default function HomePage() {
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> Optional AI help while learning</li>
                 </ul>
               </div>
-              <Link
-                href="/register"
-                className="mt-8 py-3.5 px-4 text-center rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 transition"
-              >
-                Enroll Full Academy <ArrowRight className="w-4 h-4" />
-              </Link>
+              {pricing.payments_enabled && pricing.full_course_payments_enabled ? <Link href="/register" className="mt-8 py-3.5 px-4 text-center rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 transition">Enroll Full Academy <ArrowRight className="w-4 h-4"/></Link> : <p className="mt-8 rounded-2xl bg-white/10 p-3 text-center text-xs font-semibold text-slate-300">Full-course payments open after all paid months are published.</p>}
             </div>
 
             {/* Monthly Subscription */}
@@ -442,12 +439,7 @@ export default function HomePage() {
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> No automatic recurring charge</li>
                 </ul>
               </div>
-              <Link
-                href="/register"
-                className="mt-8 py-3.5 px-4 text-center rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition"
-              >
-                Choose Monthly Plan
-              </Link>
+              {pricing.payments_enabled && pricing.monthly_payments_enabled ? <Link href="/register" className="mt-8 py-3.5 px-4 text-center rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition">Choose Monthly Plan</Link> : <p className="mt-8 rounded-2xl bg-white/10 p-3 text-center text-xs font-semibold text-slate-300">Monthly payments open when the next paid month is published.</p>}
             </div>
           </div>
         </div>
@@ -497,7 +489,11 @@ export default function HomePage() {
             <span>— The 4-Month Python & AI Online School.</span>
           </div>
           <div>
-            Built with Next.js, Pyodide Wasm, Supabase & Google Gemini AI.
+            <div className="flex flex-wrap items-center gap-4">
+              <span>Built with Next.js, Pyodide Wasm, Supabase & Google Gemini AI.</span>
+              <Link className="underline hover:text-slate-300" href="/terms">Terms</Link>
+              <Link className="underline hover:text-slate-300" href="/privacy">Privacy</Link>
+            </div>
           </div>
         </div>
       </footer>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
-import { BookOpen, CheckCircle2, CreditCard, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CheckCircle2, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 
 type Course = { id: string; slug: string; title: string; language_code: string; description: string; status: 'draft' | 'published' | 'archived' }
 type Module = { id: number; course_id: string; month_number: number; title: string; tagline: string | null; description: string | null; is_free: boolean; order_index: number; status: 'draft' | 'published' | 'archived' }
@@ -14,11 +14,12 @@ type LessonDraft = { session_number: number; title: string; analogy: string; con
 type LessonAnswer = { correctOption: number; explanation: string }
 type Person = { id: string; full_name: string; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
-type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments'
+type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments' | 'admissions'
 type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number }
 type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
 type PaymentPricing = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number }
-type PaymentSettings = PaymentPricing & { payments_enabled: boolean; paybill_number: string; account_number: string }
+type PaymentSettings = PaymentPricing & { payments_enabled: boolean; monthly_payments_enabled: boolean; full_course_payments_enabled: boolean; paybill_number: string; account_number: string }
+type AdmissionDocument = { version: number; title: string; content_markdown: string; requires_reacceptance: boolean; published_at: string }
 
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50'
@@ -40,6 +41,9 @@ export default function AdminPage() {
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
   const [paymentPricingDraft, setPaymentPricingDraft] = useState<PaymentPricing | null>(null)
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
+  const [admissionDocument, setAdmissionDocument] = useState<AdmissionDocument | null>(null)
+  const [admissionDraft, setAdmissionDraft] = useState({ title: '', content_markdown: '' })
+  const [admissionMajorChange, setAdmissionMajorChange] = useState(false)
   const [declineReasons, setDeclineReasons] = useState<Record<string, string>>({})
   const [selectedCourse, setSelectedCourse] = useState('')
   const [selectedInstructor, setSelectedInstructor] = useState('')
@@ -57,17 +61,19 @@ export default function AdminPage() {
     if (profileError) throw profileError
     if (profile?.role !== 'admin') { setAccess('denied'); return }
 
-    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult] = await Promise.all([
+    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult] = await Promise.all([
       supabase.from('courses').select('id,slug,title,language_code,description,status').order('created_at'),
       supabase.from('modules').select('id,course_id,month_number,title,tagline,description,is_free,order_index,status').order('course_id').order('month_number').order('order_index'),
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
       supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
       supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle(),
-      supabase.from('payment_settings').select('payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle(),
+      supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle(),
       supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
+      supabase.from('admission_document_versions').select('version,title,content_markdown,requires_reacceptance,published_at').order('version', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('admission_document_draft').select('title,content_markdown').eq('id', true).maybeSingle(),
     ])
-    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult]) {
+    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult]) {
       if (result.error) throw result.error
     }
     setCourses((courseResult.data ?? []) as Course[])
@@ -82,6 +88,8 @@ export default function AdminPage() {
       setPaymentPricingDraft({ monthly_amount_kes: settings.monthly_amount_kes, full_course_amount_kes: settings.full_course_amount_kes, full_course_regular_amount_kes: settings.full_course_regular_amount_kes, monthly_amount_usd: settings.monthly_amount_usd, full_course_amount_usd: settings.full_course_amount_usd, full_course_regular_amount_usd: settings.full_course_regular_amount_usd })
     }
     setPaymentRequests((paymentRequestsResult.data ?? []) as PaymentRequest[])
+    if (admissionResult.data) setAdmissionDocument(admissionResult.data as AdmissionDocument)
+    if (admissionDraftResult.data) setAdmissionDraft(admissionDraftResult.data as { title: string; content_markdown: string })
     setSelectedCourse((current) => current || courseResult.data?.[0]?.id || '')
     setAccess('allowed')
   }, [supabase])
@@ -249,6 +257,33 @@ export default function AdminPage() {
     await perform(async () => await supabase.from('payment_settings').update({ ...paymentPricingDraft, updated_at: new Date().toISOString() }).eq('id', true), 'Pricing saved. Public price cards and learner Paybill options now use these amounts.')
   }
 
+  async function saveAdmissionDraft() {
+    await perform(async () => await supabase.rpc('admin_save_admission_draft', {
+      p_title: admissionDraft.title,
+      p_content_markdown: admissionDraft.content_markdown,
+    }), 'Admission guide draft saved. It is not visible to learners until published.')
+  }
+
+  async function publishAdmissionDocument() {
+    const published = await perform(async () => {
+      const draft = await supabase.rpc('admin_save_admission_draft', { p_title: admissionDraft.title, p_content_markdown: admissionDraft.content_markdown })
+      if (draft.error) return draft
+      const result = await supabase.rpc('admin_publish_admission_document', { p_requires_reacceptance: admissionMajorChange })
+      return result.error ? result : { error: null }
+    }, admissionMajorChange ? 'Major admission guide update published. Learners and affected guardians will need to review it again.' : 'Admission guide update published without forcing current learners to accept it again.')
+    if (published) {
+      if (admissionMajorChange) {
+        try {
+          const response = await fetch('/api/admission/notify-guardians', { method: 'POST' })
+          const result = await response.json()
+          if (response.ok) setMessage(`${result.sent} of ${result.total} guardian review emails sent.${result.failed ? ` ${result.failed} could not be sent: ${result.error ?? 'Email service unavailable.'}` : ''}`)
+          else setErrorMessage(result.error ?? 'The new guide is published, but guardian emails could not be sent.')
+        } catch { setErrorMessage('The new guide is published, but guardian emails could not be sent. Check the email setup and resend from the guardian workflow.') }
+      }
+      setAdmissionMajorChange(false)
+    }
+  }
+
   const selectedCourseRow = courses.find((course) => course.id === selectedCourse)
   const selectedCourseModules = modules.filter((module) => module.course_id === selectedCourse)
   const studentCount = people.filter((person) => person.role === 'student').length
@@ -262,6 +297,7 @@ export default function AdminPage() {
     { id: 'courses', label: 'Courses', icon: GraduationCap },
     { id: 'curriculum', label: 'Curriculum review', icon: BookOpen },
     { id: 'instructors', label: 'Instructors', icon: Users },
+    { id: 'admissions', label: 'Admission guide', icon: FileText },
     { id: 'payments', label: `Payments${paymentRequests.filter((request) => request.status === 'pending').length ? ` · ${paymentRequests.filter((request) => request.status === 'pending').length}` : ''}`, icon: CreditCard },
     { id: 'hero', label: 'Landing hero image', icon: ImageIcon },
   ]
@@ -326,10 +362,25 @@ export default function AdminPage() {
           </section>
         </>}
 
+        {view === 'admissions' && <>
+          <section><h2 className="text-2xl font-extrabold">Admission document</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Edit the learner guide here. Saving keeps a private draft. Publishing creates an immutable version. Mark only a major change when learners must accept it again; price-only changes do not require re-acceptance.</p></section>
+          {admissionDocument && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950">Current published version: {admissionDocument.version} · {new Date(admissionDocument.published_at).toLocaleString()} · {admissionDocument.requires_reacceptance ? 'Major update' : 'No re-acceptance required'}</p>}
+          <form onSubmit={(event) => { event.preventDefault(); void saveAdmissionDraft() }} className="space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <label className="block text-sm font-semibold">Document title<input required minLength={5} maxLength={160} className={`${inputClass} mt-1`} value={admissionDraft.title} onChange={(event) => setAdmissionDraft((current) => ({ ...current, title: event.target.value }))}/></label>
+            <label className="block text-sm font-semibold">Document content (plain text with Markdown headings and lists)<textarea required minLength={100} maxLength={30000} rows={24} className={`${inputClass} mt-1 font-mono text-xs leading-5`} value={admissionDraft.content_markdown} onChange={(event) => setAdmissionDraft((current) => ({ ...current, content_markdown: event.target.value }))}/></label>
+            <label className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-950"><input type="checkbox" checked={admissionMajorChange} onChange={(event) => setAdmissionMajorChange(event.target.checked)} className="mt-1 h-4 w-4 accent-emerald-700"/><span>This is a major change. Learners and under-18 guardians must review and accept this version again.</span></label>
+            <div className="flex flex-wrap gap-3"><button type="button" disabled={busy} onClick={() => void saveAdmissionDraft()} className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold">Save draft</button><button type="button" disabled={busy} onClick={() => void publishAdmissionDocument()} className={buttonClass}>Publish new version</button></div>
+          </form>
+        </>}
+
         {view === 'payments' && <>
           <section><h2 className="text-2xl font-extrabold">Manual Paybill payments</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Review each learner’s receipt suffix and payer phone against the M-Pesa message you received. Confirming grants the selected access; declining keeps the record and shares your reason.</p></section>
           {paymentSettings && <>
             <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Accept new payment requests</h3><p className="mt-1 text-xs text-stone-500">Paybill {paymentSettings.paybill_number} · Account {paymentSettings.account_number}</p><p className="mt-1 text-xs text-stone-500">Turning this off blocks new requests but keeps pending reviews and confirmed access.</p></div><button disabled={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ payments_enabled: !paymentSettings.payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.payments_enabled ? 'New payment requests are disabled.' : 'New payment requests are enabled.')} className={`${buttonClass} ${paymentSettings.payments_enabled ? 'bg-rose-700 hover:bg-rose-800' : ''}`}>{paymentSettings.payments_enabled ? 'Disable payments' : 'Enable payments'}</button><span className={`rounded-full px-3 py-1 text-xs font-bold ${paymentSettings.payments_enabled ? 'bg-emerald-100 text-emerald-900' : 'bg-stone-100 text-stone-600'}`}>{paymentSettings.payments_enabled ? 'Enabled' : 'Disabled'}</span></section>
+            <section className="grid gap-3 md:grid-cols-2">
+              <PlanToggle title="Monthly access" description="Enable only when the next paid month has published lessons. The database checks availability when a learner submits." enabled={paymentSettings.monthly_payments_enabled} busy={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ monthly_payments_enabled: !paymentSettings.monthly_payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.monthly_payments_enabled ? 'Monthly access requests disabled.' : 'Monthly access requests enabled.')}/>
+              <PlanToggle title="Full-course access" description="Enable only after all paid months are published. The database checks published course content before it accepts a request." enabled={paymentSettings.full_course_payments_enabled} busy={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ full_course_payments_enabled: !paymentSettings.full_course_payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.full_course_payments_enabled ? 'Full-course requests disabled.' : 'Full-course requests enabled.')}/>
+            </section>
             {paymentPricingDraft && <form onSubmit={savePaymentPricing} className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Public and learner prices</h3><p className="mt-1 text-xs leading-5 text-stone-600">Set USD and KSh values separately. KSh prices are used for Paybill requests; USD is display-only. Full-course savings is calculated from regular price minus sale price. Monthly pricing has no discount.</p></div>
               <div className="grid gap-5 md:grid-cols-2">
                 {(['KES', 'USD'] as const).map((currency) => {
@@ -410,4 +461,8 @@ function LessonEditor({ session, answer, nextSessionNumber, busy, onCancel, onSa
     <p className="rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-950">The correct answer and explanation are saved in a private database table. Learners receive the explanation after they submit an answer.</p>
     <button disabled={busy} className={buttonClass}>{busy ? 'Saving…' : session ? 'Save lesson changes' : 'Create lesson'}</button>
   </form>
+}
+
+function PlanToggle({ title, description, enabled, busy, onClick }: { title: string; description: string; enabled: boolean; busy: boolean; onClick: () => void }) {
+  return <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="min-w-0 flex-1"><h3 className="font-bold">{title}</h3><p className="mt-1 text-xs leading-5 text-stone-500">{description}</p><span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${enabled ? 'bg-emerald-100 text-emerald-900' : 'bg-stone-100 text-stone-600'}`}>{enabled ? 'Enabled' : 'Disabled'}</span></div><button disabled={busy} onClick={onClick} className={`${buttonClass} ${enabled ? 'bg-rose-700 hover:bg-rose-800' : ''}`}>{enabled ? 'Disable option' : 'Enable option'}</button></section>
 }

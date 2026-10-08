@@ -12,6 +12,9 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
+    age: '',
+    guardianName: '',
+    guardianEmail: '',
     password: ''
   })
 
@@ -34,6 +37,19 @@ export default function RegisterPage() {
       setErrorMsg('Please choose a stronger password matching the criteria checklist below.')
       return
     }
+    const age = Number(formData.age)
+    if (!Number.isInteger(age) || age < 10 || age > 120) {
+      setErrorMsg('Enter your age in years (10 to 120).')
+      return
+    }
+    if (age < 18 && (formData.guardianName.trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.guardianEmail.trim()))) {
+      setErrorMsg('Learners under 18 must provide a parent or guardian name and email.')
+      return
+    }
+    if (age < 18 && formData.guardianEmail.trim().toLowerCase() === formData.email.trim().toLowerCase()) {
+      setErrorMsg('Please enter a separate parent or guardian email address.')
+      return
+    }
 
     setIsLoading(true)
 
@@ -43,7 +59,10 @@ export default function RegisterPage() {
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName.trim()
+            full_name: formData.fullName.trim(),
+            age,
+            guardian_name: age < 18 ? formData.guardianName.trim() : null,
+            guardian_email: age < 18 ? formData.guardianEmail.trim().toLowerCase() : null,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`
         }
@@ -55,7 +74,11 @@ export default function RegisterPage() {
         return
       }
 
-      setSuccessMsg('Your account is created. Check your email and verify it before signing in.')
+      if (age < 18) {
+        setSuccessMsg(`Your account is created and will remain locked until a guardian confirms. Verify your email and sign in; then we will send the one-time admission guide link to ${formData.guardianEmail.trim()}.`)
+      } else {
+        setSuccessMsg('Your account is created. Check your email and verify it before signing in. You will review the Admission Document on your first login.')
+      }
       setIsLoading(false)
     } catch (err: any) {
       setErrorMsg(err.message || 'An unexpected error occurred.')
@@ -124,6 +147,18 @@ export default function RegisterPage() {
                 />
               </div>
             </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Age in years</label>
+              <input type="number" required min={10} max={120} value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} className="w-full px-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 transition" />
+              <p className="mt-1 text-[11px] text-slate-500">We ask for your age, not your date of birth. Learners under 18 need a parent or guardian to confirm access.</p>
+            </div>
+
+            {Number(formData.age) > 0 && Number(formData.age) < 18 && <div className="space-y-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4">
+              <p className="text-xs leading-5 text-amber-100">A parent or legal guardian must review the Admission Document and confirm permission before lessons open.</p>
+              <label className="block text-xs font-semibold text-slate-300">Parent or guardian full name<input type="text" required maxLength={120} value={formData.guardianName} onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })} className="mt-1.5 w-full rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2.5 text-xs text-white"/></label>
+              <label className="block text-xs font-semibold text-slate-300">Parent or guardian email<input type="email" required value={formData.guardianEmail} onChange={(e) => setFormData({ ...formData, guardianEmail: e.target.value })} className="mt-1.5 w-full rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2.5 text-xs text-white"/></label>
+            </div>}
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Create Strong Password (8+ characters)</label>

@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
     if (authError || !user || !user.email_confirmed_at) {
       return NextResponse.json({ error: 'Sign in with a verified email to use the AI mentor.' }, { status: 401 })
     }
+    const { data: mayLearn, error: gateError } = await (await createClient()).rpc('can_use_learning_features')
+    if (gateError || mayLearn !== true) {
+      return NextResponse.json({ error: 'Complete guardian confirmation and accept the Admission Document before using lesson features.' }, { status: 403 })
+    }
 
     let body: { question?: unknown; code?: unknown; sessionTitle?: unknown }
     try {

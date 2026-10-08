@@ -64,6 +64,11 @@ export async function POST(
       return NextResponse.json({ error: 'Sign in with a verified email to submit work.' }, { status: 401 })
     }
 
+    const { data: mayLearn, error: gateError } = await userClient.rpc('can_use_learning_features')
+    if (gateError || mayLearn !== true) {
+      return NextResponse.json({ error: 'Complete guardian confirmation and accept the Admission Document before using lesson features.' }, { status: 403 })
+    }
+
     const { data: profile } = await userClient.from('profiles').select('role').eq('id', user.id).maybeSingle()
     if (profile?.role !== 'student') {
       return NextResponse.json({ error: 'Only learner accounts can submit assignments.' }, { status: 403 })
