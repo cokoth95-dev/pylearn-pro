@@ -1,30 +1,28 @@
 ﻿"use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Check, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+
+type Prices = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number; payments_enabled: boolean }
 
 export default function PricingSection() {
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
+  const [prices, setPrices] = useState<Prices>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false })
 
-  const prices = {
-    USD: {
-      month1: '$0',
-      fullCourse: '$149',
-      fullCourseOriginal: '$299',
-      monthly: '$49/mo',
-      savings: 'Save $48 with upfront full bundle'
-    },
-    KES: {
-      month1: 'KSh 0',
-      fullCourse: 'KSh 18,500',
-      fullCourseOriginal: 'KSh 35,000',
-      monthly: 'KSh 6,500/mo',
-      savings: 'Save KSh 7,500 with full 4-month bundle'
-    }
-  }
+  useEffect(() => {
+    const supabase = createClient()
+    void supabase.from('payment_settings').select('monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,payments_enabled').eq('id', true).maybeSingle().then(({ data }) => {
+      if (data) setPrices(data as Prices)
+    })
+  }, [])
 
-  const current = prices[currency]
+  const selectedMonthly = currency === 'KES' ? prices.monthly_amount_kes : prices.monthly_amount_usd
+  const selectedFull = currency === 'KES' ? prices.full_course_amount_kes : prices.full_course_amount_usd
+  const selectedRegular = currency === 'KES' ? prices.full_course_regular_amount_kes : prices.full_course_regular_amount_usd
+  const money = (amount: number) => currency === 'KES' ? `KSh ${amount.toLocaleString('en-KE')}` : `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+  const current = { month1: currency === 'KES' ? 'KSh 0' : '$0', fullCourse: money(selectedFull), fullCourseOriginal: money(selectedRegular), monthly: `${money(selectedMonthly)}/mo`, savings: selectedRegular > selectedFull ? `Save ${money(selectedRegular - selectedFull)} with the full-course bundle` : '' }
 
   return (
     <section id="pricing" className="py-24 relative overflow-hidden">
@@ -38,7 +36,7 @@ export default function PricingSection() {
             Start With Free Lessons. <span className="text-emerald-400">Paid Plans Are Coming.</span>
           </h2>
           <p className="mt-4 text-slate-400 text-base">
-            Create an account and try the lessons that are currently published. Paid enrollment is not open yet.
+            {prices.payments_enabled ? 'Create an account and use M-Pesa Paybill to request paid access.' : 'Create an account and try the published free lessons. New payment requests are currently paused.'}
           </p>
 
           {/* Currency Toggle */}
@@ -108,9 +106,9 @@ export default function PricingSection() {
               
               <div className="mt-6 flex items-baseline gap-2">
                 <span className="text-4xl font-extrabold text-white">{current.fullCourse}</span>
-                <span className="text-sm line-through text-slate-500">{current.fullCourseOriginal}</span>
+                {selectedRegular > selectedFull && <span className="text-sm line-through text-slate-500">{current.fullCourseOriginal}</span>}
               </div>
-              <div className="text-[11px] text-emerald-400 font-medium mt-1">{current.savings}</div>
+              {current.savings && <div className="text-[11px] text-emerald-400 font-medium mt-1">{current.savings}</div>}
 
               <ul className="mt-6 space-y-3 text-xs text-slate-200">
                 <li className="flex items-center gap-2">
@@ -134,7 +132,7 @@ export default function PricingSection() {
               </ul>
             </div>
 
-            <button type="button" disabled className="mt-8 w-full rounded-xl bg-stone-500/30 px-4 py-3 text-xs font-bold text-slate-300">Paid enrollment is not open yet</button>
+            {prices.payments_enabled ? <Link href="/register" className="mt-8 block w-full rounded-xl bg-emerald-500 px-4 py-3 text-center text-xs font-bold text-slate-950">Create account to request payment</Link> : <button type="button" disabled className="mt-8 w-full rounded-xl bg-stone-500/30 px-4 py-3 text-xs font-bold text-slate-300">Payments currently paused</button>}
           </div>
 
           {/* Card 3: Monthly Installment Plan */}
@@ -142,7 +140,7 @@ export default function PricingSection() {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">Pay-As-You-Go</div>
               <h3 className="text-2xl font-bold text-white">Monthly Subscription</h3>
-              <p className="text-slate-400 text-xs mt-2">Monthly payment option planned. Enrollment is not open yet.</p>
+              <p className="text-slate-400 text-xs mt-2">Pay month by month with manual M-Pesa confirmation.</p>
               
               <div className="mt-6 flex items-baseline gap-2">
                 <span className="text-4xl font-extrabold text-white">{current.monthly}</span>
@@ -165,13 +163,13 @@ export default function PricingSection() {
               </ul>
             </div>
 
-            <button type="button" disabled className="mt-8 w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-semibold text-slate-400">Paid enrollment is not open yet</button>
+            {prices.payments_enabled ? <Link href="/register" className="mt-8 block w-full rounded-xl bg-white/10 px-4 py-3 text-center text-xs font-semibold text-white">Create account to request payment</Link> : <button type="button" disabled className="mt-8 w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-semibold text-slate-400">Payments currently paused</button>}
           </div>
         </div>
 
         {/* Security & Guarantee Trust Bar */}
         <div className="mt-12 text-center flex items-center justify-center gap-6 text-xs text-slate-400">
-          <span>Pricing shown is a proposal; checkout and payment processing are not active.</span>
+          <span>Paybill requests are manually reviewed by an administrator before course access is added.</span>
         </div>
       </div>
     </section>

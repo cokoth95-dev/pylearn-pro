@@ -18,35 +18,44 @@ import { HeroVisualCapsules } from '@/components/landing/HeroVisualCapsules'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import { createClient } from '@/lib/supabase/client'
 
+type PricingSettings = {
+  monthly_amount_kes: number
+  full_course_amount_kes: number
+  full_course_regular_amount_kes: number
+  monthly_amount_usd: number
+  full_course_amount_usd: number
+  full_course_regular_amount_usd: number
+  payments_enabled: boolean
+}
+
 export default function HomePage() {
   const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number }>({ url: null, opacity: 28 })
+  const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false })
   const [activeCategory, setActiveCategory] = useState<'all' | 'foundations' | 'data' | 'oop' | 'ai'>('all')
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
 
-  const prices = {
-    USD: {
-      m1: "$0",
-      full: "$149",
-      fullOriginal: "$299",
-      monthly: "$49",
-      discount: "Save $48 with full 4-month bundle"
-    },
-    KES: {
-      m1: "KSh 0",
-      full: "KSh 18,500",
-      fullOriginal: "KSh 35,000",
-      monthly: "KSh 6,500",
-      discount: "Save KSh 7,500 with full upfront bundle"
-    }
+  const money = (amount: number, selectedCurrency: 'USD' | 'KES') => selectedCurrency === 'KES'
+    ? `KSh ${amount.toLocaleString('en-KE', { maximumFractionDigits: 0 })}`
+    : `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+  const salePrice = currency === 'KES' ? pricing.full_course_amount_kes : pricing.full_course_amount_usd
+  const regularPrice = currency === 'KES' ? pricing.full_course_regular_amount_kes : pricing.full_course_regular_amount_usd
+  const saving = Math.max(0, regularPrice - salePrice)
+  const cur = {
+    m1: currency === 'KES' ? 'KSh 0' : '$0',
+    full: money(salePrice, currency),
+    fullOriginal: money(regularPrice, currency),
+    monthly: money(currency === 'KES' ? pricing.monthly_amount_kes : pricing.monthly_amount_usd, currency),
+    discount: saving > 0 ? `Save ${money(saving, currency)} with the full-course bundle` : '',
   }
-
-  const cur = prices[currency]
 
   useEffect(() => {
     const supabase = createClient()
     void supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle().then(({ data }) => {
       if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity })
+    })
+    void supabase.from('payment_settings').select('payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle().then(({ data }) => {
+      if (data) setPricing(data as PricingSettings)
     })
   }, [])
 
@@ -213,10 +222,10 @@ export default function HomePage() {
                 Choose Your Pathway
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                {['all', 'foundations', 'data', 'oop', 'ai'].map((cat) => (
+                {(['all', 'foundations', 'data', 'oop', 'ai'] as const).map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setActiveCategory(cat as any)}
+                    onClick={() => setActiveCategory(cat)}
                     className={`px-4 py-2 rounded-xl transition cursor-pointer capitalize ${
                       activeCategory === cat
                         ? 'bg-amber-400 text-slate-950 font-bold'
@@ -339,7 +348,7 @@ export default function HomePage() {
               Start Free Today. <span className="text-amber-400">Pay As You Master.</span>
             </h2>
             <p className="text-slate-400 text-sm mt-2">
-              Month 1 is 100% Free with zero credit card required. Upgrade only when you are ready to unlock Months 2 through 4.
+              Month 1 is free. {pricing.payments_enabled ? 'Pay by M-Pesa Paybill after creating your learner account.' : 'New payment requests are currently paused.'}
             </p>
 
             <div className="mt-8 inline-flex items-center p-1 rounded-2xl bg-[#0d1117] border border-white/10">
@@ -396,17 +405,17 @@ export default function HomePage() {
               <div>
                 <span className="text-xs font-extrabold uppercase text-amber-400">Full 4-Month Academy</span>
                 <h3 className="text-2xl font-black text-white mt-1">Zero to Python Pro</h3>
-                <p className="text-xs text-slate-400 mt-2">Complete 16-week transformation with all 4 milestone capstones.</p>
+                <p className="text-xs text-slate-400 mt-2">Complete the four-month course and its published learning modules.</p>
                 <div className="mt-6 flex items-baseline gap-2">
                   <span className="text-4xl font-black text-white">{cur.full}</span>
-                  <span className="text-sm line-through text-slate-500">{cur.fullOriginal}</span>
+                  {regularPrice > salePrice && <span className="text-sm line-through text-slate-500">{cur.fullOriginal}</span>}
                 </div>
-                <div className="text-[11px] text-amber-300 font-semibold mt-1">{cur.discount}</div>
+                {cur.discount && <div className="text-[11px] text-amber-300 font-semibold mt-1">{cur.discount}</div>}
                 <ul className="mt-6 space-y-2.5 text-xs text-slate-200">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> All 16 Weeks & 4 Modules Unlocked</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> 4 Production Portfolio Capstones</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> Verified QR Digital PDF Certificate</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> 1-Click Add to LinkedIn</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> Access to all published paid modules</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> New course lessons appear as they are published</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> Browser-based coding practice and quick checks</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-400" /> Optional AI help while learning</li>
                 </ul>
               </div>
               <Link
@@ -422,15 +431,15 @@ export default function HomePage() {
               <div>
                 <span className="text-xs font-extrabold uppercase text-sky-400">Pay-As-You-Go</span>
                 <h3 className="text-2xl font-black text-white mt-1">Monthly Subscription</h3>
-                <p className="text-xs text-slate-400 mt-2">Flexible month-by-month payments. Cancel or pause anytime.</p>
+                <p className="text-xs text-slate-400 mt-2">One month of access for 30 days after admin confirms your M-Pesa payment.</p>
                 <div className="mt-6 flex items-baseline gap-2">
                   <span className="text-4xl font-black text-white">{cur.monthly}</span>
                   <span className="text-xs text-slate-500">/ billed monthly</span>
                 </div>
                 <ul className="mt-6 space-y-2.5 text-xs text-slate-300">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> Unlock modules month by month</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> Full access to assignments & AI</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> No long-term lock-in</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> Unlock the next paid course month</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> Browser-based coding practice and quick checks</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-sky-400" /> No automatic recurring charge</li>
                 </ul>
               </div>
               <Link

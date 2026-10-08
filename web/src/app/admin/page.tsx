@@ -17,7 +17,8 @@ type CourseInstructor = { course_id: string; instructor_id: string }
 type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments'
 type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number }
 type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
-type PaymentSettings = { payments_enabled: boolean; paybill_number: string; account_number: string; monthly_amount_kes: number; full_course_amount_kes: number }
+type PaymentPricing = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number }
+type PaymentSettings = PaymentPricing & { payments_enabled: boolean; paybill_number: string; account_number: string }
 
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50'
@@ -37,6 +38,7 @@ export default function AdminPage() {
   const [courseInstructors, setCourseInstructors] = useState<CourseInstructor[]>([])
   const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28 })
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
+  const [paymentPricingDraft, setPaymentPricingDraft] = useState<PaymentPricing | null>(null)
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [declineReasons, setDeclineReasons] = useState<Record<string, string>>({})
   const [selectedCourse, setSelectedCourse] = useState('')
@@ -62,7 +64,7 @@ export default function AdminPage() {
       supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
       supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle(),
-      supabase.from('payment_settings').select('payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes').eq('id', true).maybeSingle(),
+      supabase.from('payment_settings').select('payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd').eq('id', true).maybeSingle(),
       supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
     ])
     for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult]) {
@@ -74,7 +76,11 @@ export default function AdminPage() {
     setPeople((personResult.data ?? []) as Person[])
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
     if (siteSettingsResult.data) setHeroSettings(siteSettingsResult.data as SiteSettings)
-    if (paymentSettingsResult.data) setPaymentSettings(paymentSettingsResult.data as PaymentSettings)
+    if (paymentSettingsResult.data) {
+      const settings = paymentSettingsResult.data as PaymentSettings
+      setPaymentSettings(settings)
+      setPaymentPricingDraft({ monthly_amount_kes: settings.monthly_amount_kes, full_course_amount_kes: settings.full_course_amount_kes, full_course_regular_amount_kes: settings.full_course_regular_amount_kes, monthly_amount_usd: settings.monthly_amount_usd, full_course_amount_usd: settings.full_course_amount_usd, full_course_regular_amount_usd: settings.full_course_regular_amount_usd })
+    }
     setPaymentRequests((paymentRequestsResult.data ?? []) as PaymentRequest[])
     setSelectedCourse((current) => current || courseResult.data?.[0]?.id || '')
     setAccess('allowed')
@@ -233,6 +239,16 @@ export default function AdminPage() {
     if (result) setDeclineReasons((current) => ({ ...current, [id]: '' }))
   }
 
+  async function savePaymentPricing(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!paymentPricingDraft) return
+    if (paymentPricingDraft.full_course_regular_amount_kes < paymentPricingDraft.full_course_amount_kes || paymentPricingDraft.full_course_regular_amount_usd < paymentPricingDraft.full_course_amount_usd) {
+      setErrorMessage('The full-course regular price must be at least as high as its sale price in both currencies.')
+      return
+    }
+    await perform(async () => await supabase.from('payment_settings').update({ ...paymentPricingDraft, updated_at: new Date().toISOString() }).eq('id', true), 'Pricing saved. Public price cards and learner Paybill options now use these amounts.')
+  }
+
   const selectedCourseRow = courses.find((course) => course.id === selectedCourse)
   const selectedCourseModules = modules.filter((module) => module.course_id === selectedCourse)
   const studentCount = people.filter((person) => person.role === 'student').length
@@ -312,7 +328,27 @@ export default function AdminPage() {
 
         {view === 'payments' && <>
           <section><h2 className="text-2xl font-extrabold">Manual Paybill payments</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Review each learner’s receipt suffix and payer phone against the M-Pesa message you received. Confirming grants the selected access; declining keeps the record and shares your reason.</p></section>
-          {paymentSettings && <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Accept new payment requests</h3><p className="mt-1 text-xs text-stone-500">Paybill {paymentSettings.paybill_number} · Account {paymentSettings.account_number} · KSh {paymentSettings.monthly_amount_kes.toLocaleString()} monthly · KSh {paymentSettings.full_course_amount_kes.toLocaleString()} full course</p><p className="mt-1 text-xs text-stone-500">Turning this off blocks new submissions but keeps the review queue and existing access intact.</p></div><button disabled={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ payments_enabled: !paymentSettings.payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.payments_enabled ? 'New payment requests are disabled.' : 'New payment requests are enabled.')} className={`${buttonClass} ${paymentSettings.payments_enabled ? 'bg-rose-700 hover:bg-rose-800' : ''}`}>{paymentSettings.payments_enabled ? 'Disable payments' : 'Enable payments'}</button><span className={`rounded-full px-3 py-1 text-xs font-bold ${paymentSettings.payments_enabled ? 'bg-emerald-100 text-emerald-900' : 'bg-stone-100 text-stone-600'}`}>{paymentSettings.payments_enabled ? 'Enabled' : 'Disabled'}</span></section>}
+          {paymentSettings && <>
+            <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Accept new payment requests</h3><p className="mt-1 text-xs text-stone-500">Paybill {paymentSettings.paybill_number} · Account {paymentSettings.account_number}</p><p className="mt-1 text-xs text-stone-500">Turning this off blocks new requests but keeps pending reviews and confirmed access.</p></div><button disabled={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ payments_enabled: !paymentSettings.payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.payments_enabled ? 'New payment requests are disabled.' : 'New payment requests are enabled.')} className={`${buttonClass} ${paymentSettings.payments_enabled ? 'bg-rose-700 hover:bg-rose-800' : ''}`}>{paymentSettings.payments_enabled ? 'Disable payments' : 'Enable payments'}</button><span className={`rounded-full px-3 py-1 text-xs font-bold ${paymentSettings.payments_enabled ? 'bg-emerald-100 text-emerald-900' : 'bg-stone-100 text-stone-600'}`}>{paymentSettings.payments_enabled ? 'Enabled' : 'Disabled'}</span></section>
+            {paymentPricingDraft && <form onSubmit={savePaymentPricing} className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Public and learner prices</h3><p className="mt-1 text-xs leading-5 text-stone-600">Set USD and KSh values separately. KSh prices are used for Paybill requests; USD is display-only. Full-course savings is calculated from regular price minus sale price. Monthly pricing has no discount.</p></div>
+              <div className="grid gap-5 md:grid-cols-2">
+                {(['KES', 'USD'] as const).map((currency) => {
+                  const keys = currency === 'KES'
+                    ? { monthly: 'monthly_amount_kes', sale: 'full_course_amount_kes', regular: 'full_course_regular_amount_kes' } as const
+                    : { monthly: 'monthly_amount_usd', sale: 'full_course_amount_usd', regular: 'full_course_regular_amount_usd' } as const
+                  const symbol = currency === 'KES' ? 'KSh' : '$'
+                  const step = currency === 'KES' ? '1' : '0.01'
+                  return <fieldset key={currency} className="space-y-3 rounded-xl border border-stone-200 p-4"><legend className="px-1 text-sm font-bold">{currency === 'KES' ? 'Kenyan shillings (M-Pesa currency)' : 'US dollars (display only)'}</legend>
+                    <label className="block text-xs font-semibold">Monthly price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.monthly]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.monthly]: Number(event.target.value) } : current)}/></label>
+                    <label className="block text-xs font-semibold">Full-course sale price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.sale]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.sale]: Number(event.target.value) } : current)}/></label>
+                    <label className="block text-xs font-semibold">Full-course regular price ({symbol})<input type="number" min="1" step={step} required className={`${inputClass} mt-1`} value={paymentPricingDraft[keys.regular]} onChange={(event) => setPaymentPricingDraft((current) => current ? { ...current, [keys.regular]: Number(event.target.value) } : current)}/></label>
+                    <p className="text-xs text-stone-500">Displayed saving: {symbol} {Math.max(0, Number(paymentPricingDraft[keys.regular]) - Number(paymentPricingDraft[keys.sale])).toLocaleString(currency === 'KES' ? 'en-KE' : 'en-US', { maximumFractionDigits: currency === 'KES' ? 0 : 2 })}</p>
+                  </fieldset>
+                })}
+              </div>
+              <button disabled={busy} className={buttonClass}>Save prices</button>
+            </form>}
+          </>}
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">Payment review queue</h3><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{paymentRequests.filter((request) => request.status === 'pending').length} pending</span></div><div className="mt-3 divide-y divide-stone-100">{paymentRequests.map((request) => <article key={request.id} className="py-4 first:pt-1"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{people.find((person) => person.id === request.student_id)?.full_name ?? 'Learner'} · {courses.find((course) => course.id === request.course_id)?.title ?? 'Course'}</p><p className="mt-1 text-xs text-stone-600">{request.purchase_type === 'full_course' ? 'Full course' : `Month ${request.target_month}`} · KSh {request.amount_kes.toLocaleString()} · Receipt …{request.receipt_suffix} · Payer {request.payer_phone}</p><p className="mt-1 text-xs text-stone-500">Submitted {new Date(request.created_at).toLocaleString()} · {request.status}</p></div>{request.status === 'pending' && <div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => void reviewPayment(request.id, 'confirmed')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Confirm payment</button></div>}</div>{request.status === 'pending' && <div className="mt-3 flex flex-wrap gap-2"><input aria-label="Decline reason for learner" maxLength={500} value={declineReasons[request.id] ?? ''} onChange={(event) => setDeclineReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Reason to show the learner if declined" className="min-w-64 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-xs"/><button disabled={busy || !(declineReasons[request.id] ?? '').trim()} onClick={() => void reviewPayment(request.id, 'declined')} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">Decline with reason</button></div>}{request.status === 'declined' && <p className="mt-2 rounded-lg bg-rose-50 p-2 text-xs text-rose-900">Declined: {request.decline_reason}</p>}</article>)}{paymentRequests.length === 0 && <p className="py-5 text-sm text-stone-500">No payment requests yet. When payments are enabled, learner requests will appear here.</p>}</div></section>
         </>}
       </main>
