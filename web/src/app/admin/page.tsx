@@ -15,7 +15,7 @@ type LessonAnswer = { correctOption: number; explanation: string }
 type Person = { id: string; full_name: string; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
 type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments' | 'admissions'
-type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number }
+type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number; hero_media_type: 'image' | 'video' }
 type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
 type PaymentPricing = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number }
 type PaymentSettings = PaymentPricing & { payments_enabled: boolean; monthly_payments_enabled: boolean; full_course_payments_enabled: boolean; paybill_number: string; account_number: string; usd_kes_rate: number | null; usd_kes_rate_date: string | null; usd_kes_rate_source: string | null }
@@ -37,7 +37,8 @@ export default function AdminPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [people, setPeople] = useState<Person[]>([])
   const [courseInstructors, setCourseInstructors] = useState<CourseInstructor[]>([])
-  const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28 })
+  const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28, hero_media_type: 'image' })
+  const [heroUrlDraft, setHeroUrlDraft] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
   const [paymentPricingDraft, setPaymentPricingDraft] = useState<PaymentPricing | null>(null)
   const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
@@ -67,7 +68,7 @@ export default function AdminPage() {
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
       supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
-      supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle(),
+      supabase.from('site_settings').select('hero_image_url,hero_image_opacity,hero_media_type').eq('id', 'main').maybeSingle(),
       supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,usd_kes_rate,usd_kes_rate_date,usd_kes_rate_source').eq('id', true).maybeSingle(),
       supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
       supabase.from('admission_document_versions').select('version,title,content_markdown,requires_reacceptance,published_at').order('version', { ascending: false }).limit(1).maybeSingle(),
@@ -81,7 +82,11 @@ export default function AdminPage() {
     setSessions((sessionResult.data ?? []) as Session[])
     setPeople((personResult.data ?? []) as Person[])
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
-    if (siteSettingsResult.data) setHeroSettings(siteSettingsResult.data as SiteSettings)
+    if (siteSettingsResult.data) {
+      const settings = siteSettingsResult.data as SiteSettings
+      setHeroSettings(settings)
+      setHeroUrlDraft(settings.hero_image_url ?? '')
+    }
     if (paymentSettingsResult.data) {
       const settings = paymentSettingsResult.data as PaymentSettings
       setPaymentSettings(settings)
@@ -214,31 +219,56 @@ export default function AdminPage() {
 
   async function uploadHeroImage(file: File | undefined) {
     if (!file) return
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
-    if (!allowedTypes.includes(file.type)) { setErrorMessage('Choose a JPG, PNG, WebP, or AVIF image.'); return }
-    if (file.size > 5 * 1024 * 1024) { setErrorMessage('Choose an image smaller than 5 MB.'); return }
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'video/mp4', 'video/webm']
+    if (!allowedTypes.includes(file.type)) { setErrorMessage('Choose a JPG, PNG, WebP, AVIF, GIF, MP4, or WebM file.'); return }
+    if (file.size > 20 * 1024 * 1024) { setErrorMessage('Choose a media file smaller than 20 MB.'); return }
     setBusy(true); setMessage(''); setErrorMessage('')
-    const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif' } as Record<string, string>)[file.type]
+    const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+    const extension = ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/avif': 'avif', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' } as Record<string, string>)[file.type]
     const path = `hero/${crypto.randomUUID()}.${extension}`
     const upload = await supabase.storage.from('site-assets').upload(path, file, { contentType: file.type, upsert: false })
     if (upload.error) { setErrorMessage(upload.error.message); setBusy(false); return }
     const { data: { publicUrl } } = supabase.storage.from('site-assets').getPublicUrl(path)
-    const save = await supabase.from('site_settings').update({ hero_image_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', 'main')
+    const save = await supabase.from('site_settings').update({ hero_image_url: publicUrl, hero_media_type: mediaType, updated_at: new Date().toISOString() }).eq('id', 'main')
     if (save.error) {
       await supabase.storage.from('site-assets').remove([path])
       setErrorMessage(save.error.message)
     } else {
-      setHeroSettings((current) => ({ ...current, hero_image_url: publicUrl }))
-      setMessage('Hero background image uploaded and published.')
+      setHeroSettings((current) => ({ ...current, hero_image_url: publicUrl, hero_media_type: mediaType }))
+      setHeroUrlDraft(publicUrl)
+      setMessage(`Hero background ${mediaType === 'video' ? 'video' : 'image/GIF'} uploaded and published.`)
+    }
+    setBusy(false)
+  }
+
+  async function saveHeroMediaUrl() {
+    const value = heroUrlDraft.trim()
+    let url: URL
+    try { url = new URL(value) } catch { setErrorMessage('Paste a complete direct media URL beginning with https://.'); return }
+    if (url.protocol !== 'https:') { setErrorMessage('For safety, hero media links must use HTTPS.'); return }
+    if (/(^|\.)pinterest\.[a-z.]+$/i.test(url.hostname) || /(^|\.)pin\.it$/i.test(url.hostname)) {
+      setErrorMessage('That is a Pinterest page link, not a media file. Paste the direct image/GIF address from the image itself, or use a direct MP4/WebM video URL.')
+      return
+    }
+    if (heroSettings.hero_media_type === 'video' && !/\.(mp4|webm)$/i.test(url.pathname)) {
+      setErrorMessage('Paste a direct MP4 or WebM video file URL. A video webpage cannot be used as the background source.')
+      return
+    }
+    setBusy(true); setMessage(''); setErrorMessage('')
+    const { error } = await supabase.from('site_settings').update({ hero_image_url: url.toString(), hero_media_type: heroSettings.hero_media_type, updated_at: new Date().toISOString() }).eq('id', 'main')
+    if (error) setErrorMessage(error.message)
+    else {
+      setHeroSettings((current) => ({ ...current, hero_image_url: url.toString() }))
+      setMessage('Hero media link saved. Check the preview to confirm the source allows it to be displayed.')
     }
     setBusy(false)
   }
 
   async function removeHeroImage() {
     setBusy(true); setMessage(''); setErrorMessage('')
-    const result = await supabase.from('site_settings').update({ hero_image_url: null, updated_at: new Date().toISOString() }).eq('id', 'main')
+    const result = await supabase.from('site_settings').update({ hero_image_url: null, hero_media_type: 'image', updated_at: new Date().toISOString() }).eq('id', 'main')
     if (result.error) setErrorMessage(result.error.message)
-    else { setHeroSettings((current) => ({ ...current, hero_image_url: null })); setMessage('Hero background image removed.') }
+    else { setHeroSettings((current) => ({ ...current, hero_image_url: null, hero_media_type: 'image' })); setHeroUrlDraft(''); setMessage('Hero background media removed.') }
     setBusy(false)
   }
 
@@ -312,7 +342,7 @@ export default function AdminPage() {
     { id: 'instructors', label: 'Instructors', icon: Users },
     { id: 'admissions', label: 'Admission guide', icon: FileText },
     { id: 'payments', label: `Payments${paymentRequests.filter((request) => request.status === 'pending').length ? ` · ${paymentRequests.filter((request) => request.status === 'pending').length}` : ''}`, icon: CreditCard },
-    { id: 'hero', label: 'Landing hero image', icon: ImageIcon },
+    { id: 'hero', label: 'Landing hero media', icon: ImageIcon },
   ]
 
   return <div className="admin-console min-h-screen bg-[#faf7f0] text-stone-900">
@@ -366,12 +396,14 @@ export default function AdminPage() {
         </>}
 
         {view === 'hero' && <>
-          <section><h2 className="text-2xl font-extrabold">Landing hero background</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Upload a wide image for the public home page. The image is layered behind a dark readability overlay; adjust image visibility while checking that the headline stays easy to read.</p></section>
+          <section><h2 className="text-2xl font-extrabold">Landing hero background</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Choose an image/GIF or a muted looping video. Upload a file or paste a direct HTTPS media URL. The background stays behind the text overlay; adjust visibility so the headline remains easy to read.</p></section>
           <section className="space-y-5 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-            <label className="block text-sm font-semibold">Upload a background image<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={(event) => { void uploadHeroImage(event.target.files?.[0]); event.currentTarget.value = '' }} className="mt-2 block w-full rounded-xl border border-stone-300 p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:font-semibold file:text-white"/><span className="mt-1 block text-xs font-normal text-stone-500">JPG, PNG, WebP, or AVIF; maximum 5 MB.</span></label>
-            {heroSettings.hero_image_url ? <div className="relative isolate min-h-56 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white"><div aria-hidden="true" className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `url("${heroSettings.hero_image_url}")`, opacity: heroSettings.hero_image_opacity / 100 }}/><div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/65"/><p className="text-xs font-bold uppercase tracking-wider text-amber-300">Live preview</p><h3 className="mt-3 text-2xl font-black">Your Modern Python Online School</h3><p className="mt-2 max-w-lg text-sm text-slate-100">A preview of the public hero text over your selected background.</p></div> : <div className="grid min-h-40 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-sm text-stone-500">No hero image uploaded. The landing page uses its original background.</div>}
-            <label className="block text-sm font-semibold">Image visibility: {heroSettings.hero_image_opacity}%<input type="range" min="0" max="100" step="5" value={heroSettings.hero_image_opacity} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_image_opacity: Number(event.target.value) }))} className="mt-3 block w-full accent-emerald-700"/><span className="mt-1 block text-xs font-normal text-stone-500">Lower visibility makes the image fainter. Text contrast protection remains in place.</span></label>
-            <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={() => void saveHeroOpacity()} className={buttonClass}>Save image visibility</button>{heroSettings.hero_image_url && <button disabled={busy} onClick={() => void removeHeroImage()} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50">Remove image</button>}</div>
+            <label className="block max-w-sm text-sm font-semibold">Media type<select className={`${inputClass} mt-1`} value={heroSettings.hero_media_type} disabled={busy} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_media_type: event.target.value as 'image' | 'video' }))}><option value="image">Image or animated GIF</option><option value="video">Video (muted and looping)</option></select></label>
+            <label className="block text-sm font-semibold">Upload {heroSettings.hero_media_type === 'video' ? 'a video' : 'an image or GIF'}<input type="file" accept={heroSettings.hero_media_type === 'video' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp,image/avif,image/gif'} disabled={busy} onChange={(event) => { void uploadHeroImage(event.target.files?.[0]); event.currentTarget.value = '' }} className="mt-2 block w-full rounded-xl border border-stone-300 p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:font-semibold file:text-white"/><span className="mt-1 block text-xs font-normal text-stone-500">JPG, PNG, WebP, AVIF, or GIF; MP4 or WebM video. Upload limit: 20 MB.</span></label>
+            <div className="space-y-2"><label className="block text-sm font-semibold">Or paste a direct media URL<input type="url" inputMode="url" placeholder={heroSettings.hero_media_type === 'video' ? 'https://example.com/hero.mp4' : 'https://example.com/hero.gif'} value={heroUrlDraft} onChange={(event) => setHeroUrlDraft(event.target.value)} className={`${inputClass} mt-1`}/></label><p className="text-xs leading-5 text-stone-500">Use a direct HTTPS link to the image/GIF or an MP4/WebM file. A Pinterest pin page link does not point to the media file; open the pin and copy the image address itself. The source host must allow your website to display it.</p><button type="button" disabled={busy || !heroUrlDraft.trim()} onClick={() => void saveHeroMediaUrl()} className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-50 disabled:opacity-50">Use this media link</button></div>
+            {heroSettings.hero_image_url ? <div className="relative isolate min-h-56 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white"><div aria-hidden="true" className="absolute inset-0 -z-10 overflow-hidden" style={{ opacity: heroSettings.hero_image_opacity / 100 }}>{heroSettings.hero_media_type === 'video' ? <video src={heroSettings.hero_image_url} autoPlay muted loop playsInline className="h-full w-full object-cover"/> : <img src={heroSettings.hero_image_url} alt="" className="h-full w-full object-cover"/>}</div><div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/65"/><p className="text-xs font-bold uppercase tracking-wider text-amber-300">Live preview · {heroSettings.hero_media_type === 'video' ? 'video' : 'image/GIF'}</p><h3 className="mt-3 text-2xl font-black">Your Modern Python Online School</h3><p className="mt-2 max-w-lg text-sm text-slate-100">A preview of the public hero text over your selected background.</p></div> : <div className="grid min-h-40 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-sm text-stone-500">No hero media selected. The landing page uses its original background.</div>}
+            <label className="block text-sm font-semibold">Media visibility: {heroSettings.hero_image_opacity}%<input type="range" min="0" max="100" step="5" value={heroSettings.hero_image_opacity} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_image_opacity: Number(event.target.value) }))} className="mt-3 block w-full accent-emerald-700"/><span className="mt-1 block text-xs font-normal text-stone-500">Lower visibility makes the media fainter. Text contrast protection remains in place.</span></label>
+            <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={() => void saveHeroOpacity()} className={buttonClass}>Save media visibility</button>{heroSettings.hero_image_url && <button disabled={busy} onClick={() => void removeHeroImage()} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50">Remove media</button>}</div>
           </section>
         </>}
 

@@ -33,7 +33,7 @@ type PricingSettings = {
 }
 
 export default function HomePage() {
-  const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number }>({ url: null, opacity: 28 })
+  const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number; mediaType: 'image' | 'video' }>({ url: null, opacity: 28, mediaType: 'image' })
   const [pricing, setPricing] = useState<PricingSettings>({ monthly_amount_kes: 6500, full_course_amount_kes: 18500, full_course_regular_amount_kes: 35000, monthly_amount_usd: 49, full_course_amount_usd: 149, full_course_regular_amount_usd: 299, payments_enabled: false, monthly_payments_enabled: false, full_course_payments_enabled: false, usd_kes_rate: null, usd_kes_rate_date: null })
   const [activeCategory, setActiveCategory] = useState<'all' | 'foundations' | 'data' | 'oop' | 'ai'>('all')
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
@@ -55,8 +55,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const supabase = createClient()
-    void supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle().then(({ data }) => {
-      if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity })
+    void supabase.from('site_settings').select('hero_image_url,hero_image_opacity,hero_media_type').eq('id', 'main').maybeSingle().then(({ data }) => {
+      if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity, mediaType: data.hero_media_type })
     })
     void supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,usd_kes_rate,usd_kes_rate_date').eq('id', true).maybeSingle().then(({ data }) => {
       if (data) setPricing(data as PricingSettings)
@@ -181,7 +181,7 @@ export default function HomePage() {
 
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-24 px-6 overflow-hidden border-b border-white/5">
-        {heroImage.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url("${heroImage.url}")`, opacity: heroImage.opacity / 100 }} />}
+        {heroImage.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden" style={{ opacity: heroImage.opacity / 100 }}>{heroImage.mediaType === 'video' ? <video src={heroImage.url} autoPlay muted loop playsInline className="h-full w-full object-cover"/> : <img src={heroImage.url} alt="" className="h-full w-full object-cover"/>}</div>}
         {heroImage.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[#111318]/65" />}
         <div className="absolute top-10 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute top-40 right-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-[140px] pointer-events-none" />

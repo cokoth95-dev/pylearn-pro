@@ -20,14 +20,14 @@ This status note supersedes older “completed” feature lists below. Sections 
 | Account profile | A profile page now shows email, role, XP, and current streak; learners can edit their display name. Avatar actions include profile and sign-out. |
 | Student learning | Dashboard, Python browser editor, AI help, quick checks, saved lesson completion, and XP are implemented. Running arbitrary code in the browser does not produce a trusted grade or assignment score. |
 | Content | Week 1 is loaded. Other weeks and capstone lesson content are not yet loaded. |
-| Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Admin hero image controls are live and can be tested. |
+| Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Hero media settings now support uploaded or directly linked images/GIFs and MP4/WebM video; migration 013 must be applied before publishing this update. |
 | Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
 | Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
 | Payments and pricing | Manual KCB Paybill/M-Pesa flow is live. Admins set KSh prices; USD display prices are derived from the CBK daily indicative USD/KSh rate, rounded to whole dollars. Migration 012 is applied, and commit `a4ba8a1` deploys the daily refresh. Admin must refresh the initial rate once. Paybill charges remain in KSh; this is not an automated M-Pesa integration. |
 | Admission and guardian consent | Implemented in migration 011 and the web app. Migrations 010 and 011 are applied. Vercel has email delivery configuration, which admission email delivery can reuse. The support email is `cokoth95@gmail.com`; Terms and Privacy still need an owner review. |
 | Capstones and certificates | Still planned. The app does not yet provide complete capstone submission/unlock flows or certificate creation and verification. |
-| Database updates | Migrations 001–012 are applied to the linked Supabase project. |
-| Verification | The local production build succeeds. Production commit `a4ba8a1` is Ready, and the live rate endpoint rejects unauthenticated requests. The admin must load the first rate; the daily schedule updates it afterward. |
+| Database updates | Migrations 001–012 are applied to the linked Supabase project. Migration 013 adds the hero media type and permits image/GIF/video uploads up to 20 MB. |
+| Verification | The local production build succeeds with hero media controls. The deployed production app has not yet received migration 013 or this hero media update. |
 
 ### Manual payment and pricing flow
 
