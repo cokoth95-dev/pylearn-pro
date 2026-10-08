@@ -15,7 +15,7 @@ This status note supersedes older “completed” feature lists below. Sections 
 
 | Area | Current status |
 | --- | --- |
-| Production site | The web app is deployed at the Vercel URL above. The Vercel project is now connected to the GitHub repository. Changes in this local working tree are not committed or pushed yet, so automatic deployments will start after those changes reach the connected branch. |
+| Production site | The web app is deployed at the Vercel URL above. Vercel is connected to GitHub `main`, with the project root set to `web/`. Commit `d99b2f2` is pushed and deployed. Future pushes to `main` trigger Vercel deployments. The separate raw `SESSIONS/` source folder is intentionally not committed. |
 | Authentication | Supabase sign-up, sign-in, password recovery, and reset routes exist. Password recovery has encountered Supabase rate limiting and still needs a successful end-to-end email check. |
 | Account profile | A profile page now shows email, role, XP, and current streak; learners can edit their display name. Avatar actions include profile and sign-out. |
 | Student learning | Dashboard, Python browser editor, AI help, quick checks, saved lesson completion, and XP are implemented. Running arbitrary code in the browser does not produce a trusted grade or assignment score. |
