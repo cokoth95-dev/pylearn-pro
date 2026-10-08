@@ -58,13 +58,13 @@ export function HeroVisualCapsules() {
             🎓
           </div>
           <span className="px-3 py-1 rounded-full bg-slate-950 text-emerald-300 text-[10px] font-bold">
-            Verified Credential
+            Planned Credential
           </span>
         </div>
         <div>
           <div className="font-mono text-xs font-black uppercase tracking-wider text-slate-900">Graduation</div>
-          <div className="font-extrabold text-lg leading-tight mt-1">Verified Digital PDF Certificate</div>
-          <p className="text-[11px] font-medium text-slate-900/90 mt-1">With scannable QR Code verification & 1-click LinkedIn export.</p>
+          <div className="font-extrabold text-lg leading-tight mt-1">Digital Certificate</div>
+          <p className="text-[11px] font-medium text-slate-900/90 mt-1">Certificate generation and verification are planned.</p>
         </div>
       </div>
     </div>

@@ -2,37 +2,28 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PasswordStrengthMeter, { validatePassword } from '@/components/auth/PasswordStrengthMeter'
-import { User, Mail, Phone, MapPin, Calendar, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { User, Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function RegisterPage() {
-  const router = useRouter()
   const supabase = createClient()
 
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    phoneNumber: '',
-    location: '',
-    age: '',
     password: ''
   })
 
   const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
-
-    const ageNum = parseInt(formData.age, 10)
-    if (isNaN(ageNum) || ageNum < 10 || ageNum > 120) {
-      setErrorMsg('Please enter a valid age between 10 and 120.')
-      return
-    }
+    setSuccessMsg('')
 
     const { score } = validatePassword(formData.password)
     if (formData.password.length < 8) {
@@ -52,11 +43,9 @@ export default function RegisterPage() {
         password: formData.password,
         options: {
           data: {
-            full_name: formData.fullName.trim(),
-            phone_number: formData.phoneNumber.trim(),
-            location: formData.location.trim(),
-            age: ageNum
-          }
+            full_name: formData.fullName.trim()
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`
         }
       })
 
@@ -66,7 +55,8 @@ export default function RegisterPage() {
         return
       }
 
-      router.push('/dashboard')
+      setSuccessMsg('Your account is created. Check your email and verify it before signing in.')
+      setIsLoading(false)
     } catch (err: any) {
       setErrorMsg(err.message || 'An unexpected error occurred.')
       setIsLoading(false)
@@ -97,6 +87,13 @@ export default function RegisterPage() {
             </div>
           )}
 
+          {successMsg && (
+            <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2" role="status">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Full Name</label>
@@ -123,55 +120,6 @@ export default function RegisterPage() {
                   placeholder="alex@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Phone Number</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="+254 712 345 678"
-                    value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Location (City, Country)</label>
-                <div className="relative">
-                  <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nairobi, Kenya"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Age</label>
-              <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="number"
-                  min={10}
-                  max={120}
-                  required
-                  placeholder="24"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 transition"
                 />
               </div>

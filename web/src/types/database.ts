@@ -9,20 +9,18 @@
 export interface Profile {
   id: string
   full_name: string
-  phone_number: string
-  location: string
-  email: string
-  age: number
   role: 'student' | 'instructor' | 'admin'
   xp: number
   streak_count: number
-  fee_status: 'free_month1' | 'paid_full' | 'paid_monthly' | 'scholarship'
+  last_activity_date: string | null
+  fee_status: 'free_month1' | 'paid_full' | 'paid_monthly' | 'scholarship' | null
   created_at: string
   updated_at: string
 }
 
 export interface Module {
   id: number
+  course_id: string
   month_number: number
   title: string
   tagline: string | null
@@ -30,6 +28,7 @@ export interface Module {
   capstone_title: string | null
   is_free: boolean
   order_index: number
+  status: 'draft' | 'published' | 'archived'
   created_at: string
   sessions?: Session[]
 }
@@ -47,8 +46,15 @@ export interface Session {
   hints: string[] | Json
   xp_reward: number
   order_index: number
+  duration_minutes: number
+  quick_check: QuickCheck
   created_at: string
   assignment?: Assignment
+}
+
+export interface QuickCheck {
+  question: string
+  options: string[]
 }
 
 export interface Assignment {
@@ -98,6 +104,18 @@ export interface UserProgress {
   draft_code: string | null
   timer_seconds_spent: number
   last_accessed: string
+  completed_at: string | null
+  completed_content_snapshot: Json | null
+}
+
+export interface QuickCheckAttempt {
+  id: string
+  student_id: string
+  session_id: number
+  selected_option: number
+  correct: boolean
+  content_snapshot: Json
+  attempted_at: string
 }
 
 export interface Certificate {

@@ -1,297 +1,233 @@
 ﻿"use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { BookOpen, Award, Flame, Zap, Play, CheckCircle, Clock, ChevronRight, Lock, Sparkles, Layers, DollarSign } from 'lucide-react'
+import { CheckCircle, ChevronRight, Clock, Flame, Lock, Play, Sparkles, Zap } from 'lucide-react'
+import ThemeToggle from '@/components/theme/ThemeToggle'
+import AccountMenu from '@/components/account/AccountMenu'
+import { visibleStreak } from '@/lib/learning-streak'
+import { createClient } from '@/lib/supabase/client'
+
+type ModuleRow = {
+  id: number
+  month_number: number
+  title: string
+  tagline: string | null
+  is_free: boolean
+  order_index: number
+}
+
+type SessionRow = {
+  id: number
+  module_id: number
+  session_number: number
+  title: string
+  order_index: number
+  duration_minutes: number
+}
+
+type LessonProgress = { session_id: number; completed: boolean; completed_at: string | null }
 
 export default function DashboardPage() {
-  const [showFeeModal, setShowFeeModal] = useState(false)
-  const [showSessionsModal, setShowSessionsModal] = useState(false)
+  const [student, setStudent] = useState({ xp: 0, streak: 0, role: 'student' })
+  const [courseTitle, setCourseTitle] = useState('Python Foundations')
+  const [modules, setModules] = useState<ModuleRow[]>([])
+  const [sessions, setSessions] = useState<SessionRow[]>([])
+  const [progress, setProgress] = useState<LessonProgress[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
-  const student = {
-    name: "Alex Kamau",
-    level: 1,
-    xp: 250,
-    streak: 3,
-    feeStatus: "Free Trial (Month 1 Active)",
-    currentSessionId: 1
-  }
+  useEffect(() => {
+    let active = true
+    async function loadDashboard() {
+      const supabase = createClient()
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+          window.location.assign('/login')
+          return
+        }
 
-  const modules = [
-    {
-      month: 1,
-      title: "Foundations & Pure Logic",
-      tagline: "Weeks 1–4",
-      status: "Active (Free)",
-      isUnlocked: true,
-      progress: 25,
-      sessionsCount: 20
-    },
-    {
-      month: 2,
-      title: "Data Structures & File Automation",
-      tagline: "Weeks 5–8",
-      status: "Milestone Gated",
-      isUnlocked: false,
-      progress: 0,
-      sessionsCount: 20
-    },
-    {
-      month: 3,
-      title: "OOP, Web APIs & Microservices",
-      tagline: "Weeks 9–12",
-      status: "Milestone Gated",
-      isUnlocked: false,
-      progress: 0,
-      sessionsCount: 20
-    },
-    {
-      month: 4,
-      title: "Data Science, AI & Web Engineering",
-      tagline: "Weeks 13–16",
-      status: "Milestone Gated",
-      isUnlocked: false,
-      progress: 0,
-      sessionsCount: 20
+        const [{ data: profile, error: profileError }, { data: course, error: courseError }] = await Promise.all([
+          supabase.from('profiles').select('full_name,xp,streak_count,last_activity_date,role').eq('id', user.id).maybeSingle(),
+          supabase.from('courses').select('id,title').eq('slug', 'python-foundations').eq('status', 'published').maybeSingle(),
+        ])
+        if (profileError) throw profileError
+        if (courseError) throw courseError
+        if (!course) throw new Error('The Python Foundations course is not published yet.')
+
+        const { data: enrollment, error: enrollmentError } = await supabase
+          .from('course_enrollments')
+          .select('id,plan,status,started_at,paid_through')
+          .eq('course_id', course.id)
+          .eq('student_id', user.id)
+          .maybeSingle()
+        if (enrollmentError) throw enrollmentError
+        if (!enrollment) throw new Error('Your account is not enrolled in this course yet.')
+
+        const { data: visibleModules, error: modulesError } = await supabase
+          .from('modules')
+          .select('id,month_number,title,tagline,is_free,order_index')
+          .eq('course_id', course.id)
+          .eq('status', 'published')
+          .order('order_index')
+        if (modulesError) throw modulesError
+        const moduleRows = (visibleModules ?? []) as ModuleRow[]
+        const moduleIds = moduleRows.map((module) => module.id)
+
+        const [sessionResult, progressResult] = await Promise.all([
+          moduleIds.length
+            ? supabase.from('sessions').select('id,module_id,session_number,title,order_index,duration_minutes').in('module_id', moduleIds).order('order_index')
+            : Promise.resolve({ data: [], error: null }),
+          supabase.from('user_progress').select('session_id,completed,completed_at').eq('student_id', user.id),
+        ])
+        if (sessionResult.error) throw sessionResult.error
+        if (progressResult.error) throw progressResult.error
+        if (!active) return
+
+        setStudent({
+          xp: profile?.xp ?? 0,
+          streak: visibleStreak(profile?.streak_count ?? 0, profile?.last_activity_date ?? null),
+          role: profile?.role ?? 'student',
+        })
+        setCourseTitle(course.title)
+        setModules(moduleRows)
+        setSessions((sessionResult.data ?? []) as SessionRow[])
+        setProgress((progressResult.data ?? []) as LessonProgress[])
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : 'We could not load your learning data.')
+      } finally {
+        if (active) setLoading(false)
+      }
     }
-  ]
+    void loadDashboard()
+    return () => { active = false }
+  }, [])
+
+  const completedIds = useMemo(() => new Set(progress.filter((item) => item.completed).map((item) => item.session_id)), [progress])
+  const orderedSessions = useMemo(() => {
+    const monthOrder = new Map(modules.map((module) => [module.id, module.order_index]))
+    return [...sessions].sort((a, b) =>
+      (monthOrder.get(a.module_id) ?? 0) - (monthOrder.get(b.module_id) ?? 0) || a.order_index - b.order_index,
+    )
+  }, [modules, sessions])
+  const focusSession = orderedSessions.find((session) => !completedIds.has(session.id)) ?? orderedSessions.at(-1) ?? null
+  const progressThisWeek = progress.filter((item) => {
+    if (!item.completed) return false
+    if (!item.completed_at) return false
+    const date = new Date(item.completed_at)
+    const monday = new Date()
+    monday.setHours(0, 0, 0, 0)
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+    return date >= monday
+  }).length
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
-      {/* Top Student Header */}
-      <header className="h-16 px-6 bg-slate-900/80 border-b border-white/5 backdrop-blur-xl flex items-center justify-between sticky top-0 z-30">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-slate-900/80 px-6 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <span className="text-2xl">🐍</span>
+          <span className="text-2xl" aria-hidden="true">🐍</span>
           <div>
-            <span className="font-extrabold text-base text-white tracking-tight">PyLearn <span className="text-emerald-400">Pro</span></span>
-            <span className="text-[10px] text-slate-400 block -mt-1">Student Learning Academy</span>
+            <span className="font-extrabold text-base tracking-tight text-white">PyLearn <span className="text-emerald-400">Pro</span></span>
+            <span className="-mt-1 block text-[10px] text-slate-400">Student Learning Academy</span>
           </div>
         </div>
-
-        <div className="flex items-center gap-4 text-xs font-semibold">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-amber-300">
-            <Flame className="w-4 h-4 text-amber-400 fill-current" />
-            <span>{student.streak} Day Streak</span>
+        <div className="flex items-center gap-3 text-xs font-semibold">
+          {student.role === 'admin' && <Link href="/admin" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-700 hover:bg-emerald-500/20">Admin panel</Link>}
+          {student.role === 'instructor' && <Link href="/instructor" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-700 hover:bg-emerald-500/20">Instructor workspace</Link>}
+          <ThemeToggle />
+          <div className="hidden items-center gap-1.5 rounded-xl border border-white/5 bg-slate-800 px-3 py-1.5 text-amber-300 sm:flex">
+            <Flame className="h-4 w-4 text-amber-400" />
+            <span>{student.streak > 0 ? `${student.streak} day streak` : 'Streaks are optional'}</span>
           </div>
-
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-white/5 text-purple-300">
-            <Zap className="w-4 h-4 text-purple-400" />
-            <span>{student.xp} XP (Level {student.level})</span>
+          <div className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-slate-800 px-3 py-1.5 text-purple-300">
+            <Zap className="h-4 w-4 text-purple-400" />
+            <span>{student.xp} XP</span>
           </div>
-
-          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-            <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center text-xs">
-              AK
-            </div>
-            <span className="hidden sm:inline text-slate-200">{student.name}</span>
-          </div>
+          <AccountMenu dark />
         </div>
       </header>
 
-      {/* Main Student Dashboard Content */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10 space-y-8">
-        {/* Welcome Target Card */}
-        <div className="rounded-3xl glass-panel p-8 border border-emerald-500/20 glass-glow-emerald relative overflow-hidden bg-gradient-to-r from-emerald-500/10 via-slate-900/80 to-cyan-500/10">
-          <div className="max-w-2xl relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> Today's Focus Session
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-              Day 1: Genesis — Thinking Like a Python Programmer
-            </h1>
-            <p className="mt-2 text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Master variables as labeled storage jars, primitive types, and interactive prompts. Complete today's milestone to earn +50 XP and keep your 3-day streak alive!
-            </p>
-
-            <div className="mt-6 flex flex-wrap items-center gap-4">
-              <Link
-                href="/classroom/1"
-                className="px-6 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition"
-              >
-                <Play className="w-4 h-4 fill-current" /> Continue Session →
-              </Link>
-              <button
-                onClick={() => setShowSessionsModal(true)}
-                className="px-5 py-3 rounded-xl glass-panel hover:bg-white/10 text-slate-200 font-semibold text-xs flex items-center gap-2 transition cursor-pointer"
-              >
-                <Layers className="w-4 h-4 text-cyan-400" /> View All Sessions Modal
-              </button>
-              <button
-                onClick={() => setShowFeeModal(true)}
-                className="px-5 py-3 rounded-xl glass-panel hover:bg-white/10 text-slate-200 font-semibold text-xs flex items-center gap-2 transition cursor-pointer"
-              >
-                <DollarSign className="w-4 h-4 text-amber-400" /> Course Outline & Fees
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* 4-Month Progress Roadmap */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-bold text-white">Your 4-Month Python Mastery Journey</h2>
-              <p className="text-slate-400 text-xs mt-0.5">Milestone-gated progression across 16 weeks and 4 production capstones.</p>
-            </div>
-            <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-              Month 1 Active
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {modules.map((m) => (
-              <div
-                key={m.month}
-                className={`p-6 rounded-2xl glass-panel border transition relative ${
-                  m.isUnlocked ? 'border-emerald-500/30 bg-slate-900/60' : 'border-white/5 opacity-75'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Month {m.month} • {m.tagline}
-                  </span>
-                  {m.isUnlocked ? (
-                    <span className="text-[11px] font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10">
-                      Unlocked
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 px-2 py-0.5 rounded bg-slate-800">
-                      <Lock className="w-3 h-3" /> Locked
-                    </span>
-                  )}
+      <main className="mx-auto w-full max-w-6xl flex-1 space-y-8 px-6 py-10">
+        {loadError && (
+          <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200" role="alert">{loadError}</div>
+        )}
+        {loading ? (
+          <div className="rounded-3xl border border-emerald-500/20 bg-slate-900/60 p-8 text-sm text-slate-300" role="status">Loading your course and progress…</div>
+        ) : !loadError && (
+          <>
+            <section className="relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-slate-900/80 to-cyan-500/10 p-8">
+              <div className="relative z-10 max-w-2xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+                  <Sparkles className="h-3.5 w-3.5" /> Continue learning
                 </div>
-
-                <h3 className="text-lg font-bold text-white mb-2">{m.title}</h3>
-
-                {/* Progress Bar */}
-                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden my-3">
-                  <div className="h-full bg-emerald-400 rounded-full transition-all duration-500" style={{ width: `${m.progress}%` }} />
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-400 mt-4">
-                  <span>{m.sessionsCount} Sessions (30m each)</span>
-                  {m.isUnlocked ? (
-                    <Link href="/classroom/1" className="text-emerald-400 font-bold hover:underline flex items-center gap-1">
-                      Enter Classroom <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  ) : (
-                    <span className="text-slate-600">Pass Month {m.month - 1} Capstone to Unlock</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </main>
-
-      {/* MODAL 1: Sessions List Modal */}
-      {showSessionsModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
-          <div className="w-full max-w-2xl glass-panel rounded-3xl border border-white/10 p-6 max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-white/5">
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
-                <Layers className="w-5 h-5" />
-                <span>Month 1: Foundations & Logic — Sessions List</span>
-              </div>
-              <button
-                onClick={() => setShowSessionsModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2.5 py-1 rounded-lg bg-slate-800"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto py-4 space-y-2.5 text-xs">
-              {[
-                { num: 1, title: "Day 1: Genesis — Thinking Like a Python Programmer", done: true, time: "30m" },
-                { num: 2, title: "Day 2: Data Types as Physical Containers (Int, Float, Str, Bool)", done: false, time: "30m" },
-                { num: 3, title: "Day 3: Control Flow Crossroads — If, Elif, Else Logic", done: false, time: "30m" },
-                { num: 4, title: "Day 4: Repeating Clocks — While and For Loop Iterations", done: false, time: "30m" },
-                { num: 5, title: "Day 5: Capstone 1: Automated Personal Expense & Budget Auditor", done: false, time: "45m" }
-              ].map((sess) => (
-                <div
-                  key={sess.num}
-                  className="p-3.5 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-between hover:border-emerald-500/30 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    {sess.done ? (
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[9px] text-slate-400 font-bold">
-                        {sess.num}
-                      </div>
-                    )}
-                    <span className={sess.done ? 'text-slate-400 line-through' : 'text-white font-medium'}>
-                      {sess.title}
-                    </span>
-                  </div>
-
-                  <Link
-                    href={`/classroom/${sess.num}`}
-                    onClick={() => setShowSessionsModal(false)}
-                    className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 font-semibold text-[11px] transition"
-                  >
-                    Launch IDE →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: Course Outline & Fee Structure Breakdown Modal */}
-      {showFeeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-fadeIn">
-          <div className="w-full max-w-3xl glass-panel rounded-3xl border border-white/10 p-6 max-h-[85vh] flex flex-col shadow-2xl overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-white/5">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
-                <DollarSign className="w-5 h-5" />
-                <span>4-Month Course Outline & Tuition Breakdown</span>
-              </div>
-              <button
-                onClick={() => setShowFeeModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2.5 py-1 rounded-lg bg-slate-800"
-              >
-                ✕ Close
-              </button>
-            </div>
-
-            <div className="py-4 space-y-6 text-xs text-slate-300">
-              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
-                <strong>Your Current Status:</strong> Month 1 Active (100% Free Trial). You have access to all Week 1–4 sessions and Capstone 1.
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-xl bg-slate-900 border border-white/10">
-                  <div className="text-[11px] text-slate-400 font-bold uppercase">Month 1</div>
-                  <div className="text-xl font-bold text-white mt-1">FREE ($0)</div>
-                  <p className="text-[11px] text-slate-400 mt-2">Foundations, Syntax & Logic</p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-900 border border-emerald-500/40 bg-emerald-500/5">
-                  <div className="text-[11px] text-emerald-400 font-bold uppercase">Full 4-Month Bundle</div>
-                  <div className="text-xl font-bold text-white mt-1">$149 / KSh 18,500</div>
-                  <p className="text-[11px] text-emerald-300 mt-2">All 16 weeks + Verified PDF Cert</p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-slate-900 border border-white/10">
-                  <div className="text-[11px] text-cyan-400 font-bold uppercase">Monthly Plan</div>
-                  <div className="text-xl font-bold text-white mt-1">$49 / KSh 6,500/mo</div>
-                  <p className="text-[11px] text-slate-400 mt-2">Pay month by month as you learn</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-white mb-2">Supported Payment Gateways:</h4>
-                <p className="text-slate-400 text-xs">
-                  We accept <strong>Credit/Debit Cards (Stripe)</strong>, <strong>MPesa / Mobile Money</strong>, <strong>PayPal</strong>, and direct bank transfers. You can upload transaction proof directly for instant admin activation.
+                <h1 className="text-2xl font-extrabold text-white sm:text-3xl">{focusSession?.title ?? `Welcome to ${courseTitle}`}</h1>
+                <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                  {focusSession ? 'Pick up with a short lesson. Your weekly goal is five sessions, and your progress is saved as you complete each quick check.' : 'Your course lessons are being prepared. They will appear here when published.'}
                 </p>
+                <div className="mt-6 flex flex-wrap items-center gap-4">
+                  {focusSession && <Link href={`/classroom/${focusSession.id}`} className="flex items-center gap-2 rounded-xl bg-emerald-400 px-6 py-3 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300">
+                    <Play className="h-4 w-4 fill-current" /> Continue session <ChevronRight className="h-4 w-4" />
+                  </Link>}
+                  <span className="rounded-xl border border-white/10 bg-slate-900/50 px-4 py-3 text-xs text-slate-300">This week: {Math.min(progressThisWeek, 5)} of 5 sessions</span>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </section>
+
+            <section>
+              <div className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Your Python learning path</h2>
+                  <p className="mt-1 text-xs text-slate-400">Lessons and completion are loaded from your account.</p>
+                </div>
+                {modules.length > 0 && <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">{modules.length} published module{modules.length === 1 ? '' : 's'}</span>}
+              </div>
+
+              {modules.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-500/40 p-6 text-sm text-slate-400">No lessons are currently available to this account. If you just enrolled, refresh the page in a moment.</div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {modules.map((module) => {
+                    const moduleSessions = orderedSessions.filter((session) => session.module_id === module.id)
+                    const completedCount = moduleSessions.filter((session) => completedIds.has(session.id)).length
+                    const percent = moduleSessions.length ? Math.round(completedCount / moduleSessions.length * 100) : 0
+                    return (
+                      <article key={module.id} className="rounded-2xl border border-emerald-500/25 bg-slate-900/60 p-6">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Month {module.month_number} • {module.tagline ?? `${moduleSessions.length} sessions`}</span>
+                          <span className="rounded bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-400">Available</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-white">{module.title}</h3>
+                        <div className="my-4 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${percent}%` }} /></div>
+                        <p className="mb-4 text-xs text-slate-400">{completedCount} of {moduleSessions.length} sessions complete</p>
+                        <div className="space-y-2">
+                          {moduleSessions.map((session, sessionIndex) => {
+                            const done = completedIds.has(session.id)
+                            const firstIncomplete = moduleSessions.findIndex((item) => !completedIds.has(item.id))
+                            const unlocked = done || firstIncomplete < 0 || sessionIndex <= firstIncomplete
+                            const rowClass = `flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-slate-950/30 px-3 py-2.5 text-xs ${unlocked ? 'transition hover:border-emerald-500/30 hover:bg-slate-900' : 'cursor-not-allowed opacity-50'}`
+                            const rowContent = <>
+                              <span className="flex min-w-0 items-center gap-2">
+                                {done ? <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" /> : unlocked ? <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-slate-500 text-[9px] text-slate-400">{session.session_number}</span> : <Lock className="h-4 w-4 shrink-0 text-slate-500"/>}
+                                <span className={done ? 'truncate text-slate-400' : 'truncate font-medium text-slate-200'}>{session.title}</span>
+                              </span>
+                              <span className="flex shrink-0 items-center gap-1 text-slate-400"><Clock className="h-3.5 w-3.5" />{session.duration_minutes}m</span>
+                            </>
+                            return unlocked
+                              ? <Link key={session.id} href={`/classroom/${session.id}`} className={rowClass}>{rowContent}</Link>
+                              : <div key={session.id} aria-disabled="true" title="Complete the previous lesson first" className={rowClass}>{rowContent}</div>
+                          })}
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+            <p className="text-center text-xs text-slate-500">Your work stays yours. You can learn at your own pace; streaks are optional.</p>
+          </>
+        )}
+      </main>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -10,44 +10,32 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  const [identifier, setIdentifier] = useState('') // Email or Phone number
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [notice, setNotice] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('checkEmail') === '1') {
+      setNotice('Check your inbox and verify your email before signing in.')
+    }
+    if (params.get('error') === 'confirmation') {
+      setErrorMsg('That verification link could not be completed. Request a new one or try signing in.')
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg('')
     setIsLoading(true)
 
-    const cleanIdentifier = identifier.trim()
-
     try {
-      let loginEmail = cleanIdentifier
-
-      // 1. Dual-Credential Resolution: Check if input is a phone number instead of an email
-      const isEmail = cleanIdentifier.includes('@')
-      if (!isEmail) {
-        // Query profiles table to find the email corresponding to this phone number
-        const { data: profileData, error: profileErr } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('phone_number', cleanIdentifier)
-          .single()
-
-        if (profileErr || !profileData?.email) {
-          setErrorMsg('No student account found with this phone number.')
-          setIsLoading(false)
-          return
-        }
-        loginEmail = profileData.email
-      }
-
-      // 2. Sign in with resolved email + password
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: password
+        email: email.trim(),
+        password,
       })
 
       if (error) {
@@ -56,8 +44,18 @@ export default function LoginPage() {
         return
       }
 
-      // 3. Redirect to Student Classroom Welcome Hub
-      router.push('/dashboard')
+      if (!data.user?.email_confirmed_at) {
+        await supabase.auth.signOut()
+        setErrorMsg('Please verify your email using the link we sent before signing in.')
+        setIsLoading(false)
+        return
+      }
+
+      const requestedPath = new URLSearchParams(window.location.search).get('next')
+      const nextPath = requestedPath?.startsWith('/') && !requestedPath.startsWith('//') && !requestedPath.includes('\\')
+        ? requestedPath
+        : '/dashboard'
+      router.replace(nextPath)
     } catch (err: any) {
       setErrorMsg(err.message || 'An unexpected error occurred.')
       setIsLoading(false)
@@ -79,7 +77,7 @@ export default function LoginPage() {
             </span>
           </Link>
           <h2 className="text-xl font-bold text-white mt-4">Welcome Back, Student!</h2>
-          <p className="text-slate-400 text-xs mt-1">Sign in with your Email Address or Phone Number.</p>
+          <p className="text-slate-400 text-xs mt-1">Sign in with your email address.</p>
         </div>
 
         {/* Form Container */}
@@ -91,20 +89,25 @@ export default function LoginPage() {
             </div>
           )}
 
+          {notice && (
+            <div className="mb-6 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs" role="status">
+              {notice}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Dual Identifier Field: Email or Phone */}
+            {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Email Address or Phone Number
-              </label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Email Address</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder="alex@example.com or +254 712 345 678"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  autoComplete="email"
+                  placeholder="alex@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition"
                 />
               </div>
@@ -114,7 +117,7 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-300">Password</label>
-                <a href="#" className="text-[11px] text-slate-500 hover:text-emerald-400 transition">Forgot password?</a>
+                <Link href="/forgot-password" className="text-[11px] text-slate-500 hover:text-emerald-400 transition">Forgot password?</Link>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />

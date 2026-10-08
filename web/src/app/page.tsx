@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Sparkles,
@@ -15,8 +15,11 @@ import {
 } from 'lucide-react'
 import HeroPlayground from '@/components/landing/HeroPlayground'
 import { HeroVisualCapsules } from '@/components/landing/HeroVisualCapsules'
+import ThemeToggle from '@/components/theme/ThemeToggle'
+import { createClient } from '@/lib/supabase/client'
 
 export default function HomePage() {
+  const [heroImage, setHeroImage] = useState<{ url: string | null; opacity: number }>({ url: null, opacity: 28 })
   const [activeCategory, setActiveCategory] = useState<'all' | 'foundations' | 'data' | 'oop' | 'ai'>('all')
   const [currency, setCurrency] = useState<'USD' | 'KES'>('USD')
   const [openFaq, setOpenFaq] = useState<number | null>(0)
@@ -39,6 +42,13 @@ export default function HomePage() {
   }
 
   const cur = prices[currency]
+
+  useEffect(() => {
+    const supabase = createClient()
+    void supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle().then(({ data }) => {
+      if (data) setHeroImage({ url: data.hero_image_url, opacity: data.hero_image_opacity })
+    })
+  }, [])
 
   const modules = [
     {
@@ -94,26 +104,26 @@ export default function HomePage() {
     },
     {
       q: "How does Month 1 Free access work?",
-      a: "When you register, Month 1 (Weeks 1 to 4) is completely free forever. You get access to the interactive IDE, video illustrations, flashcards, automated test cases, and your first capstone project with zero credit card required."
+      a: "The first Python lessons are free to try, and no payment details are needed to create an account. The course currently saves lesson progress and quick-check results. Capstones and flashcard tools are still being prepared."
     },
     {
       q: "What payment methods are supported for unlocking Months 2 through 4?",
-      a: "We support Credit/Debit Cards (Stripe), MPesa / Mobile Money, PayPal, and direct bank transfers with instant verification."
+      a: "Online payment is not enabled yet. Paid course access will open after payment options and account verification are ready."
     },
     {
       q: "What happens if my code gets stuck on an assignment?",
-      a: "Our integrated Google Gemini 3.6 Flash AI Tutor inspects your code, identifies your exact mistake, and offers gentle Socratic hints using everyday analogies without spoiling the answer."
+      a: "You can ask the AI mentor for help when you want it. It gives beginner-friendly explanations and hints."
     },
     {
       q: "Will I receive a verified certificate upon graduation?",
-      a: "Yes! When you complete all 16 weeks and pass all 4 Capstone projects, you receive a verifiable digital PDF certificate with an embedded QR code and 1-click LinkedIn export."
+      a: "Certificates are planned, but the app does not issue graduation certificates yet. We will share the requirements before certificate awards are enabled."
     }
   ]
 
   const filteredModules = activeCategory === 'all' ? modules : modules.filter(m => m.category === activeCategory)
 
   return (
-    <div className="min-h-screen bg-[#111318] text-[#f0f6fc]">
+    <div className="landing-page min-h-screen bg-[#111318] text-stone-900">
       {/* Top Navbar */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#111318]/85 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -139,6 +149,7 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/login"
               className="px-5 py-2.5 text-xs font-bold text-slate-200 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
@@ -157,10 +168,12 @@ export default function HomePage() {
 
       {/* HERO SECTION */}
       <section className="relative pt-12 pb-24 px-6 overflow-hidden border-b border-white/5">
+        {heroImage.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url("${heroImage.url}")`, opacity: heroImage.opacity / 100 }} />}
+        {heroImage.url && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[#111318]/65" />}
         <div className="absolute top-10 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />
         <div className="absolute top-40 right-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-[140px] pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Left Column */}
           <div className="lg:col-span-6 space-y-6 text-left">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-amber-300 text-xs font-bold tracking-wide">

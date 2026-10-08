@@ -1,13 +1,33 @@
 ﻿# 🐍 PyLearn Pro: Master Project Documentation & Status Audit
 
-> **Platform**: PyLearn Pro (Desktop App & Full-Stack Web Academy)  
+> **Platform**: PyLearn Pro (desktop learning prototype and web academy in active development)  
 > **Repository**: [https://github.com/cokoth95-dev/pylearn-pro](https://github.com/cokoth95-dev/pylearn-pro)  
 > **Live Production Web Application**: [https://web-mu-seven-40.vercel.app](https://web-mu-seven-40.vercel.app)  
 > **Production Hosting**: Vercel (Edge & Serverless)  
 > **Database & Auth**: Supabase Cloud (PostgreSQL, Row-Level Security, Auth)  
 > **In-Browser Execution**: Pyodide (WebAssembly Python 3.12)  
 > **Code Editor**: Monaco Editor (VS Code Engine with Python IntelliSense)  
-> **AI Mentorship & Autograding**: Google Gemini 3.6 Flash (Socratic Layman Feedback)
+> **AI Mentorship**: Google Gemini API; current web route uses `gemini-2.5-flash`. Trusted assignment grading is disabled in the no-cost browser-practice mode.
+
+## Current implementation status (authoritative)
+
+This status note supersedes older “completed” feature lists below. Sections 2–7 preserve the original product vision and early implementation notes; they are not a claim that every listed web feature is currently shipped.
+
+| Area | Current status |
+| --- | --- |
+| Production site | The web app is deployed at the Vercel URL above. The Vercel project is now connected to the GitHub repository. Changes in this local working tree are not committed or pushed yet, so automatic deployments will start after those changes reach the connected branch. |
+| Authentication | Supabase sign-up, sign-in, password recovery, and reset routes exist. Password recovery has encountered Supabase rate limiting and still needs a successful end-to-end email check. |
+| Account profile | A profile page now shows email, role, XP, and current streak; learners can edit their display name. Avatar actions include profile and sign-out. |
+| Student learning | Dashboard, Python browser editor, AI help, quick checks, saved lesson completion, and XP are implemented. Running arbitrary code in the browser does not produce a trusted grade or assignment score. |
+| Content | Week 1 is loaded. Other weeks and capstone lesson content are not yet loaded. |
+| Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Admin hero image controls are live and can be tested. |
+| Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
+| Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
+| Payments, capstones, certificates | These are planned end-to-end features, not working web flows yet. The current landing-page copy has been corrected to avoid promising live payments or automatic certificates. |
+| Database updates | Migrations 001–008 are applied to the linked Supabase project. |
+| Verification | Local and Vercel production builds succeeded. The new profile, hero image, and streak interactions still need owner testing with signed-in accounts. |
+
+The owner confirmed that `cokoth95@gmail.com` can sign in with Admin access and switch to the learner view. Password recovery verification is intentionally deferred for now. The owner will test instructor and learner workflows and report back.
 
 ---
 

@@ -1,7 +1,7 @@
 ﻿"use client"
 
 import React, { useState } from 'react'
-import { Check, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Check, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 export default function PricingSection() {
@@ -35,10 +35,10 @@ export default function PricingSection() {
             <Sparkles className="w-3.5 h-3.5" /> Transparent & Flexible Tuition
           </div>
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Start Free Today. <span className="text-emerald-400">Pay As You Master.</span>
+            Start With Free Lessons. <span className="text-emerald-400">Paid Plans Are Coming.</span>
           </h2>
           <p className="mt-4 text-slate-400 text-base">
-            Month 1 is 100% free with zero credit card required. Upgrade only when you are ready to unlock Months 2 through 4.
+            Create an account and try the lessons that are currently published. Paid enrollment is not open yet.
           </p>
 
           {/* Currency Toggle */}
@@ -68,21 +68,21 @@ export default function PricingSection() {
               <p className="text-slate-400 text-xs mt-2">Zero commitment. Test the pedagogy and build your first project.</p>
               <div className="mt-6 flex items-baseline gap-2">
                 <span className="text-4xl font-extrabold text-white">{current.month1}</span>
-                <span className="text-xs text-slate-500">/ forever free</span>
+                <span className="text-xs text-slate-500">/ currently free</span>
               </div>
 
               <ul className="mt-6 space-y-3 text-xs text-slate-300">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Full Month 1 Classroom Access (Weeks 1–4)
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Access to currently published free lessons
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" /> In-Browser Pyodide Code Sandbox
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Google Gemini AI Socratic Hint Mentor
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Optional AI learning help
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Capstone 1: Budget & Expense Auditor
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> More projects will be added as lessons are prepared
                 </li>
               </ul>
             </div>
@@ -114,32 +114,27 @@ export default function PricingSection() {
 
               <ul className="mt-6 space-y-3 text-xs text-slate-200">
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> All 16 Weeks & 4 Modules Unlocked
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Planned: all 16 weeks and 4 modules
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> 4 Production Portfolio Capstone Projects
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Planned: four portfolio capstones
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Automated QR-Verified Digital PDF Certificate
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Planned: verifiable graduation certificate
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> 1-Click Add to LinkedIn Certification
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Planned: LinkedIn certificate sharing
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Unlimited Automated Gemini AI Code Reviews
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Trusted code grading is not available yet
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> MPesa, Stripe, PayPal & Bank Transfer
+                  <Check className="w-4 h-4 text-emerald-400 shrink-0" /> Payment methods have not been enabled
                 </li>
               </ul>
             </div>
 
-            <Link
-              href="/register"
-              className="mt-8 w-full py-3 px-4 text-center rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition"
-            >
-              Enroll Full Academy <ArrowRight className="w-4 h-4" />
-            </Link>
+            <button type="button" disabled className="mt-8 w-full rounded-xl bg-stone-500/30 px-4 py-3 text-xs font-bold text-slate-300">Paid enrollment is not open yet</button>
           </div>
 
           {/* Card 3: Monthly Installment Plan */}
@@ -147,7 +142,7 @@ export default function PricingSection() {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-2">Pay-As-You-Go</div>
               <h3 className="text-2xl font-bold text-white">Monthly Subscription</h3>
-              <p className="text-slate-400 text-xs mt-2">Flexible month-by-month payments. Cancel or pause anytime.</p>
+              <p className="text-slate-400 text-xs mt-2">Monthly payment option planned. Enrollment is not open yet.</p>
               
               <div className="mt-6 flex items-baseline gap-2">
                 <span className="text-4xl font-extrabold text-white">{current.monthly}</span>
@@ -159,10 +154,10 @@ export default function PricingSection() {
                   <Check className="w-4 h-4 text-cyan-400 shrink-0" /> Unlock modules month by month
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-cyan-400 shrink-0" /> Full access to assignments & AI grading
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" /> Assignment grading is being prepared
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-cyan-400 shrink-0" /> Certificate awarded upon Month 4 completion
+                  <Check className="w-4 h-4 text-cyan-400 shrink-0" /> Graduation certificate is planned
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-cyan-400 shrink-0" /> No long-term lock-in
@@ -170,24 +165,13 @@ export default function PricingSection() {
               </ul>
             </div>
 
-            <Link
-              href="/register"
-              className="mt-8 w-full py-3 px-4 text-center rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition"
-            >
-              Choose Monthly Plan
-            </Link>
+            <button type="button" disabled className="mt-8 w-full rounded-xl bg-white/10 px-4 py-3 text-xs font-semibold text-slate-400">Paid enrollment is not open yet</button>
           </div>
         </div>
 
         {/* Security & Guarantee Trust Bar */}
         <div className="mt-12 text-center flex items-center justify-center gap-6 text-xs text-slate-400">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" /> 14-Day Money-Back Guarantee
-          </span>
-          <span>•</span>
-          <span>Instant Automated Activation</span>
-          <span>•</span>
-          <span>Secure Encrypted Checkout</span>
+          <span>Pricing shown is a proposal; checkout and payment processing are not active.</span>
         </div>
       </div>
     </section>
