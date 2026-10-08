@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
-import { BookOpen, CheckCircle2, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CheckCircle2, CreditCard, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 
 type Course = { id: string; slug: string; title: string; language_code: string; description: string; status: 'draft' | 'published' | 'archived' }
 type Module = { id: number; course_id: string; month_number: number; title: string; tagline: string | null; description: string | null; is_free: boolean; order_index: number; status: 'draft' | 'published' | 'archived' }
@@ -14,8 +14,10 @@ type LessonDraft = { session_number: number; title: string; analogy: string; con
 type LessonAnswer = { correctOption: number; explanation: string }
 type Person = { id: string; full_name: string; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
-type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero'
+type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments'
 type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number }
+type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
+type PaymentSettings = { payments_enabled: boolean; paybill_number: string; account_number: string; monthly_amount_kes: number; full_course_amount_kes: number }
 
 const inputClass = 'w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15'
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50'
@@ -34,6 +36,9 @@ export default function AdminPage() {
   const [people, setPeople] = useState<Person[]>([])
   const [courseInstructors, setCourseInstructors] = useState<CourseInstructor[]>([])
   const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28 })
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
+  const [declineReasons, setDeclineReasons] = useState<Record<string, string>>({})
   const [selectedCourse, setSelectedCourse] = useState('')
   const [selectedInstructor, setSelectedInstructor] = useState('')
   const [message, setMessage] = useState('')
@@ -50,15 +55,17 @@ export default function AdminPage() {
     if (profileError) throw profileError
     if (profile?.role !== 'admin') { setAccess('denied'); return }
 
-    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult] = await Promise.all([
+    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult] = await Promise.all([
       supabase.from('courses').select('id,slug,title,language_code,description,status').order('created_at'),
       supabase.from('modules').select('id,course_id,month_number,title,tagline,description,is_free,order_index,status').order('course_id').order('month_number').order('order_index'),
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
       supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
       supabase.from('site_settings').select('hero_image_url,hero_image_opacity').eq('id', 'main').maybeSingle(),
+      supabase.from('payment_settings').select('payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes').eq('id', true).maybeSingle(),
+      supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
     ])
-    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult]) {
+    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult]) {
       if (result.error) throw result.error
     }
     setCourses((courseResult.data ?? []) as Course[])
@@ -67,16 +74,33 @@ export default function AdminPage() {
     setPeople((personResult.data ?? []) as Person[])
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
     if (siteSettingsResult.data) setHeroSettings(siteSettingsResult.data as SiteSettings)
+    if (paymentSettingsResult.data) setPaymentSettings(paymentSettingsResult.data as PaymentSettings)
+    setPaymentRequests((paymentRequestsResult.data ?? []) as PaymentRequest[])
     setSelectedCourse((current) => current || courseResult.data?.[0]?.id || '')
     setAccess('allowed')
   }, [supabase])
 
+  const refreshPaymentQueue = useCallback(async () => {
+    const { data, error } = await supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false })
+    if (!error) setPaymentRequests((data ?? []) as PaymentRequest[])
+  }, [supabase])
+
   useEffect(() => {
-    void loadData().catch((error) => {
-      setErrorMessage(error instanceof Error ? error.message : 'We could not load the admin workspace.')
-      setAccess('denied')
-    })
+    async function initializeWorkspace() {
+      try { await loadData() }
+      catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'We could not load the admin workspace.')
+        setAccess('denied')
+      }
+    }
+    void initializeWorkspace()
   }, [loadData])
+
+  useEffect(() => {
+    if (access !== 'allowed') return
+    const timer = window.setInterval(() => { void refreshPaymentQueue() }, 30000)
+    return () => window.clearInterval(timer)
+  }, [access, refreshPaymentQueue])
 
   async function perform(action: () => Promise<{ error: { message: string } | null }>, success: string): Promise<boolean> {
     setBusy(true); setMessage(''); setErrorMessage('')
@@ -204,6 +228,11 @@ export default function AdminPage() {
     setBusy(false)
   }
 
+  async function reviewPayment(id: string, decision: 'confirmed' | 'declined') {
+    const result = await perform(async () => await supabase.rpc('admin_review_payment_request', { p_request_id: id, p_decision: decision, p_decline_reason: decision === 'declined' ? declineReasons[id]?.trim() ?? '' : null }), decision === 'confirmed' ? 'Payment confirmed and access granted.' : 'Payment declined. The learner can see the reason and submit again.')
+    if (result) setDeclineReasons((current) => ({ ...current, [id]: '' }))
+  }
+
   const selectedCourseRow = courses.find((course) => course.id === selectedCourse)
   const selectedCourseModules = modules.filter((module) => module.course_id === selectedCourse)
   const studentCount = people.filter((person) => person.role === 'student').length
@@ -217,6 +246,7 @@ export default function AdminPage() {
     { id: 'courses', label: 'Courses', icon: GraduationCap },
     { id: 'curriculum', label: 'Curriculum review', icon: BookOpen },
     { id: 'instructors', label: 'Instructors', icon: Users },
+    { id: 'payments', label: `Payments${paymentRequests.filter((request) => request.status === 'pending').length ? ` · ${paymentRequests.filter((request) => request.status === 'pending').length}` : ''}`, icon: CreditCard },
     { id: 'hero', label: 'Landing hero image', icon: ImageIcon },
   ]
 
@@ -278,6 +308,12 @@ export default function AdminPage() {
             <label className="block text-sm font-semibold">Image visibility: {heroSettings.hero_image_opacity}%<input type="range" min="0" max="100" step="5" value={heroSettings.hero_image_opacity} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_image_opacity: Number(event.target.value) }))} className="mt-3 block w-full accent-emerald-700"/><span className="mt-1 block text-xs font-normal text-stone-500">Lower visibility makes the image fainter. Text contrast protection remains in place.</span></label>
             <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={() => void saveHeroOpacity()} className={buttonClass}>Save image visibility</button>{heroSettings.hero_image_url && <button disabled={busy} onClick={() => void removeHeroImage()} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50">Remove image</button>}</div>
           </section>
+        </>}
+
+        {view === 'payments' && <>
+          <section><h2 className="text-2xl font-extrabold">Manual Paybill payments</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">Review each learner’s receipt suffix and payer phone against the M-Pesa message you received. Confirming grants the selected access; declining keeps the record and shares your reason.</p></section>
+          {paymentSettings && <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Accept new payment requests</h3><p className="mt-1 text-xs text-stone-500">Paybill {paymentSettings.paybill_number} · Account {paymentSettings.account_number} · KSh {paymentSettings.monthly_amount_kes.toLocaleString()} monthly · KSh {paymentSettings.full_course_amount_kes.toLocaleString()} full course</p><p className="mt-1 text-xs text-stone-500">Turning this off blocks new submissions but keeps the review queue and existing access intact.</p></div><button disabled={busy} onClick={() => void perform(async () => await supabase.from('payment_settings').update({ payments_enabled: !paymentSettings.payments_enabled, updated_at: new Date().toISOString() }).eq('id', true), paymentSettings.payments_enabled ? 'New payment requests are disabled.' : 'New payment requests are enabled.')} className={`${buttonClass} ${paymentSettings.payments_enabled ? 'bg-rose-700 hover:bg-rose-800' : ''}`}>{paymentSettings.payments_enabled ? 'Disable payments' : 'Enable payments'}</button><span className={`rounded-full px-3 py-1 text-xs font-bold ${paymentSettings.payments_enabled ? 'bg-emerald-100 text-emerald-900' : 'bg-stone-100 text-stone-600'}`}>{paymentSettings.payments_enabled ? 'Enabled' : 'Disabled'}</span></section>}
+          <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">Payment review queue</h3><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">{paymentRequests.filter((request) => request.status === 'pending').length} pending</span></div><div className="mt-3 divide-y divide-stone-100">{paymentRequests.map((request) => <article key={request.id} className="py-4 first:pt-1"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-semibold">{people.find((person) => person.id === request.student_id)?.full_name ?? 'Learner'} · {courses.find((course) => course.id === request.course_id)?.title ?? 'Course'}</p><p className="mt-1 text-xs text-stone-600">{request.purchase_type === 'full_course' ? 'Full course' : `Month ${request.target_month}`} · KSh {request.amount_kes.toLocaleString()} · Receipt …{request.receipt_suffix} · Payer {request.payer_phone}</p><p className="mt-1 text-xs text-stone-500">Submitted {new Date(request.created_at).toLocaleString()} · {request.status}</p></div>{request.status === 'pending' && <div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => void reviewPayment(request.id, 'confirmed')} className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Confirm payment</button></div>}</div>{request.status === 'pending' && <div className="mt-3 flex flex-wrap gap-2"><input aria-label="Decline reason for learner" maxLength={500} value={declineReasons[request.id] ?? ''} onChange={(event) => setDeclineReasons((current) => ({ ...current, [request.id]: event.target.value }))} placeholder="Reason to show the learner if declined" className="min-w-64 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-xs"/><button disabled={busy || !(declineReasons[request.id] ?? '').trim()} onClick={() => void reviewPayment(request.id, 'declined')} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">Decline with reason</button></div>}{request.status === 'declined' && <p className="mt-2 rounded-lg bg-rose-50 p-2 text-xs text-rose-900">Declined: {request.decline_reason}</p>}</article>)}{paymentRequests.length === 0 && <p className="py-5 text-sm text-stone-500">No payment requests yet. When payments are enabled, learner requests will appear here.</p>}</div></section>
         </>}
       </main>
     </div>

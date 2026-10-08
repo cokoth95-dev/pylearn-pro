@@ -23,9 +23,19 @@ This status note supersedes older “completed” feature lists below. Sections 
 | Admin and instructor | Admin access is confirmed by the owner. Course/curriculum management and assigned-course instructor tools exist. The owner plans to test the role-specific workflows. Admin hero image controls are live and can be tested. |
 | Learning streak | Streaks are recorded by the database when a learner completes a lesson. A missed day does not remove XP; the displayed current streak expires after a gap. Migration 008 is applied. |
 | Paid grading | Deferred until funding is available. The optional hosted runner is not deployed or enabled. |
-| Payments, capstones, certificates | These are planned end-to-end features, not working web flows yet. The current landing-page copy has been corrected to avoid promising live payments or automatic certificates. |
+| Payments | Manual KCB Paybill/M-Pesa flow is implemented locally: learner requests for KSh 6,500 monthly next-module access or KSh 18,500 full-course access; admin enable/disable setting, pending queue, confirm/decline with reason, learner history, and month-specific 30-day access. Migration 009 must be applied to Supabase and the update deployed before this is live. It is not an automated M-Pesa integration. |
+| Capstones and certificates | Still planned. The app does not yet provide complete capstone submission/unlock flows or certificate creation and verification. |
 | Database updates | Migrations 001–008 are applied to the linked Supabase project. |
 | Verification | Local and Vercel production builds succeeded. The new profile, hero image, and streak interactions still need owner testing with signed-in accounts. |
+
+### Manual payment flow (implemented, pending database deployment)
+
+- Learners use `/payments` to see the Paybill instructions, select a published course and access option, and submit the last four receipt characters plus payer phone number. The app never asks for an M-Pesa PIN.
+- Payment requests are private to the learner and admin. Learners cannot set the amount, course owner, target month, or status directly; a database RPC sets these values and checks the configured prices.
+- Admins review requests in the Admin panel’s **Payments** section. Confirming grants either full-course access or access to the next unpurchased paid month for 30 days from confirmation. Declining requires a learner-visible reason; the request stays in history and can be resubmitted.
+- Payments default to disabled. Admins may disable new requests while still reviewing pending requests; existing access is unchanged. The only payment destination is KCB Paybill `522522`, account `1288171692`.
+- Month-specific entitlements are checked by both module row-level security and the quick-check grading RPC. Previously saved progress remains in the learner account when a 30-day entitlement expires.
+- Before release: apply `web/supabase/migrations/009_manual_payments.sql`, deploy the web app, then test the entire flow with a learner and admin account. Do not confirm a request unless the corresponding M-Pesa message is visible to the administrator.
 
 The owner confirmed that `cokoth95@gmail.com` can sign in with Admin access and switch to the learner view. Password recovery verification is intentionally deferred for now. The owner will test instructor and learner workflows and report back.
 
@@ -196,8 +206,8 @@ Located in `web/supabase/migrations/001_initial_schema.sql`:
 3. **Automated QR-Verified PDF Certificate Generator**:
    - Implement `/verify/[certId]` public verification page.
    - Build automated PDF generation using `@react-pdf/renderer` or `pdfkit` upon completing all 4 capstones.
-4. **Payment Gateway Webhooks**:
-   - Connect live Stripe Checkout and MPesa Daraja API webhooks to automatically switch `profiles.fee_status = 'paid_full'` upon payment confirmation.
+4. **Automated M-Pesa integration (optional later)**:
+   - The current payment workflow is manual Paybill review. Consider Daraja integration only if/when its business onboarding and operating costs are acceptable.
 5. **SuperMemo-2 (SM-2) Flashcard Classroom Tab**:
    - Embed the interactive active recall flashcard drawer directly into the classroom interface.
 

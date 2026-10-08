@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { CheckCircle, ChevronRight, Clock, Flame, Lock, Play, Sparkles, Zap } from 'lucide-react'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
+import LearnerSidebar from '@/components/navigation/LearnerSidebar'
 import { visibleStreak } from '@/lib/learning-streak'
 import { createClient } from '@/lib/supabase/client'
 
@@ -148,7 +149,9 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 space-y-8 px-6 py-10">
+      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-5 px-4 py-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:px-6">
+      <LearnerSidebar active="dashboard" dark />
+      <main className="min-w-0 space-y-8">
         {loadError && (
           <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200" role="alert">{loadError}</div>
         )}
@@ -228,6 +231,7 @@ export default function DashboardPage() {
           </>
         )}
       </main>
+      </div>
     </div>
   )
 }
