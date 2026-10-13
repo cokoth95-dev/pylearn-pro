@@ -108,9 +108,12 @@ def custom_input(prompt=""):
     if prompt:
         custom_out.write(str(prompt))
     try:
-        return next(_inputs_iter)
+        answer = next(_inputs_iter)
+        # A real terminal echoes what the learner types after the prompt.
+        custom_out.write(str(answer) + "\\n")
+        return answer
     except StopIteration:
-        return ""
+        raise EOFError("No answer was provided for this input() question. Add an answer in Program inputs, one answer per line, then run the code again.")
 
 __builtins__.input = custom_input
 

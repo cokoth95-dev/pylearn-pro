@@ -41,6 +41,7 @@ function inlineText(text: string) {
 
 function explainPythonError(traceback: string) {
   const lastLine = traceback.trim().split('\n').filter(Boolean).at(-1) ?? 'Python could not run this code.'
+  if (lastLine.startsWith('EOFError')) return 'This program asked a question, but no answer was ready. The browser editor cannot pause and open a typing prompt while Python runs. Enter each answer in Program inputs first, with one answer per line and in question order, then select Run code again.'
   if (lastLine.startsWith('SyntaxError') || lastLine.startsWith('IndentationError')) return 'Python could not read the code. Check the spelling, quotes, brackets, colon, and indentation.'
   if (lastLine.startsWith('NameError')) return 'Python cannot find a name in your code. Check the spelling and make sure the variable or function is defined before it is used.'
   if (lastLine.startsWith('TypeError')) return 'These values do not work together in this operation. Check their types; typed answers often need int(...) before math.'
@@ -231,8 +232,8 @@ function ClassroomContent() {
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950">
         <div className="flex items-center justify-between border-b border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300"><span>Python practice editor</span><span className="text-emerald-300">Browser practice · no grade saved</span></div>
-        <div className="min-h-[340px] flex-1"><Editor height="100%" defaultLanguage="python" theme="vs-dark" value={code} onChange={(value) => setCode(value ?? '')} options={{fontSize:14,fontFamily:"'Fira Code', monospace",minimap:{enabled:false},scrollBeyondLastLine:false,automaticLayout:true,tabSize:4,lineNumbers:'on',padding:{top:14,bottom:14}}}/></div>
-        <label className="border-t border-white/10 bg-slate-900/70 p-3 text-xs text-slate-300">Program inputs <span className="text-slate-500">(one answer per line, in the order Python asks)</span><textarea value={inputValues} onChange={(event) => setInputValues(event.target.value)} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950 p-2 font-mono text-xs text-slate-100" placeholder={'For example, for two input() questions:\nAmina\n12'}/></label>
+        <div className="min-h-[340px] flex-1"><Editor height="100%" defaultLanguage="python" theme="vs-dark" value={code} onChange={(value) => setCode(value ?? '')} options={{fontSize:14,fontFamily:"'Fira Code', monospace",minimap:{enabled:false},scrollBeyondLastLine:false,automaticLayout:true,tabSize:4,lineNumbers:'on',padding:{top:14,bottom:14},cursorStyle:'line',cursorBlinking:'smooth',cursorWidth:2,readOnly:false,renderLineHighlight:'all',mouseStyle:'text',glyphMargin:false}}/></div>
+        <label className="border-t border-white/10 bg-slate-900/70 p-3 text-xs text-slate-300">Answers for `input()` questions <span className="block pt-1 text-slate-400">Enter answers before you run the code. Use one answer per line, in the same order as the questions. The browser cannot open a typing prompt while Python is running.</span><textarea aria-label="Answers for input questions, one per line" value={inputValues} onChange={(event) => setInputValues(event.target.value)} rows={2} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950 p-2 font-mono text-xs text-slate-100 caret-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400" placeholder={'Example for two input() questions:\nAmina\n12'}/></label>
       </section>
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">

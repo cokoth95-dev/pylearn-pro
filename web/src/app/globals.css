@@ -209,6 +209,87 @@
   border-color: #68777d;
 }
 
+/* Give the memory inspector its own light palette instead of translucent
+   dark-terminal surfaces, which wash out the variable labels and values. */
+:root[data-theme="light"] .memory-visualizer {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-heading {
+  color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-count {
+  color: #155e75 !important;
+  background-color: #cffafe !important;
+  border-color: #67e8f9 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-empty {
+  color: #475569 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-empty code {
+  color: #047857 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-row {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-row:hover {
+  background-color: #ecfeff !important;
+  border-color: #06b6d4 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-name,
+:root[data-theme="light"] .memory-visualizer .memory-value {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-row:hover .memory-name {
+  color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-type {
+  color: #334155 !important;
+  background-color: #e2e8f0 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-value-group,
+:root[data-theme="light"] .memory-visualizer .memory-footer {
+  color: #475569 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector {
+  color: #1e293b !important;
+  background-color: #ecfeff !important;
+  border-color: #67e8f9 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector-heading {
+  color: #0e7490 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector-copy {
+  color: #334155 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector-copy .text-white {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector-copy .text-emerald-400 {
+  color: #047857 !important;
+}
+
+:root[data-theme="light"] .memory-visualizer .memory-inspector-copy .text-amber-400 {
+  color: #a16207 !important;
+}
+
 .pill-card {
   border-radius: 9999px;
   overflow: hidden;

@@ -37,7 +37,9 @@ The first line displays a message. The second line stores the text `Sam` under t
 
 **Everyday analogy:** `input()` is like asking a visitor to write their name on a sign-in sheet. The program keeps the answer so it can use it in a reply.
 
-**Plain explanation:** `input()` pauses and waits for the learner to type. The typed answer is text. An f-string lets a program place a variable inside a message.
+**Plain explanation:** `input("What is your name? ")` displays the question and gives the program an answer. In this browser classroom, type that answer in **Answers for `input()` questions** below the editor before choosing **Run code**. The browser cannot open a live typing prompt while Python is already running. Put one answer on each line, in question order.
+
+The answer from `input()` is text (a string), even when the learner types digits. For example, typing `12` gives the text `"12"`; it is not yet a number Python can add. An **f-string** is a message with `f` before its opening quote. In `f"Hello, {name}!"`, braces mean “put the current value of `name` here.” If `name` is `Amina`, Python displays `Hello, Amina!`. The practice terminal echoes your prepared answer after the question, as a real terminal echoes what you type.
 
 **Worked example:**
 
@@ -47,7 +49,7 @@ name = name.strip()
 print(f"Hello, {name}!")
 ```
 
-`strip()` removes extra spaces at the start or end. The `f` before the quote lets Python put the value of `name` inside the message.
+`name.strip()` removes spaces and line breaks from the beginning and end of the text in `name`. It keeps spaces between words. For example, `"  Amina  ".strip()` gives `"Amina"`, while `"Python class".strip()` stays `"Python class"`. A method is an operation attached to a value; the dot connects the text to `.strip()`, and parentheses tell Python to perform the operation. Writing `name = name.strip()` saves the cleaned text back into `name`.
 
 **Guided task:** Ask for a learner's name and favorite subject. Print one friendly sentence that includes both answers.
 
@@ -59,7 +61,7 @@ print(f"Hello, {name}!")
 
 **Everyday analogy:** If a class has 12 notebooks and receives 3 more, counting the total is a number problem. A typed answer starts as a written label; Python needs it changed into a number before it can add it.
 
-**Plain explanation:** `input()` gives text, even when the learner types digits. `int()` changes digit text into a whole number. Python can then add or multiply the values.
+**Plain explanation:** `input()` gives text, even when the learner types digits. `int("12")` converts digit text into the whole number `12`, which Python can add or multiply. `int("twelve")` cannot work because the letters are not digits. Use `float(...)` for a number with a decimal part, such as `2.5`.
 
 **Worked example:**
 
@@ -80,7 +82,7 @@ print(f"There are {total} notebooks.")
 
 **Everyday analogy:** A function is like a reusable classroom routine. The routine stays the same, but the name you pass in can change each time.
 
-**Plain explanation:** `def` starts a function definition. A parameter is the named space in the definition. An argument is the value given when the function is called. Indented lines belong to the function.
+**Plain explanation:** `def` begins instructions for a named function. The colon marks the start of its body, and the indented lines (which begin with spaces) belong to it. In `def welcome(name):`, `name` is a parameter: a named slot for information. In `welcome("Mina")`, `"Mina"` is the argument, the actual value supplied to that slot. Defining a function describes it; calling it makes it run.
 
 **Worked example:**
 
@@ -104,7 +106,7 @@ welcome("Ali")
 
 **Everyday analogy:** `print()` is like announcing a total to the class. `return` is like writing the total on a note and handing it back so another step can use it.
 
-**Plain explanation:** `print()` displays information. `return` sends a value back to the code that called the function. The caller can store that value, add it to something else, or print it later.
+**Plain explanation:** `print()` displays information for a person to read. `return` sends a value from inside a function back to the line that called it. That line can store the returned value, use it in more arithmetic, or print it later. A value returned by a function is not automatically displayed.
 
 **Worked example:**
 
