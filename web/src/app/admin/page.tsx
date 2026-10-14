@@ -5,14 +5,14 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
-import { BookOpen, CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Mail, MapPin, Phone, Plus, RefreshCw, Search, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Mail, Plus, RefreshCw, Search, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 
 type Course = { id: string; slug: string; title: string; language_code: string; description: string; status: 'draft' | 'published' | 'archived' }
 type Module = { id: number; course_id: string; month_number: number; title: string; tagline: string | null; description: string | null; is_free: boolean; order_index: number; status: 'draft' | 'published' | 'archived' }
 type Session = { id: number; module_id: number; session_number: number; title: string; analogy_physical: string; content_markdown: string; starter_code: string; hints: string[]; xp_reward: number; duration_minutes: number; quick_check: { question?: string; options?: string[] } }
 type LessonDraft = { session_number: number; title: string; analogy: string; content: string; starterCode: string; hints: string[]; xp: number; duration: number; question: string; options: string[]; correctOption: number; explanation: string }
 type LessonAnswer = { correctOption: number; explanation: string }
-type Person = { id: string; full_name: string; email: string; phone_number: string; location: string; age: number; xp: number; role: 'student' | 'instructor' | 'admin'; created_at: string }
+type Person = { id: string; full_name: string; email: string; age: number | null; xp: number; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
 type LearnerProgress = { student_id: string; session_id: number; completed: boolean; completed_at: string | null; timer_seconds_spent: number; last_accessed: string }
 type LearnerAttempt = { student_id: string; session_id: number; correct: boolean; attempted_at: string }
@@ -29,6 +29,12 @@ const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function formatErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') return error.message
+  return fallback
 }
 
 export default function AdminPage() {
@@ -74,7 +80,7 @@ export default function AdminPage() {
       supabase.from('courses').select('id,slug,title,language_code,description,status').order('created_at'),
       supabase.from('modules').select('id,course_id,month_number,title,tagline,description,is_free,order_index,status').order('course_id').order('month_number').order('order_index'),
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
-      supabase.from('profiles').select('id,full_name,email,phone_number,location,age,xp,role,created_at').order('full_name'),
+      supabase.rpc('admin_list_people'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
       supabase.from('user_progress').select('student_id,session_id,completed,completed_at,timer_seconds_spent,last_accessed').order('last_accessed', { ascending: false }),
       supabase.from('session_quick_check_attempts').select('student_id,session_id,correct,attempted_at').order('attempted_at', { ascending: false }),
@@ -95,7 +101,7 @@ export default function AdminPage() {
     setLearnerProgress((learnerProgressResult.data ?? []) as LearnerProgress[])
     setLearnerAttempts((learnerAttemptsResult.data ?? []) as LearnerAttempt[])
     setCourseEnrollments((enrollmentResult.data ?? []) as CourseEnrollment[])
-    setSelectedLearnerId((current) => current || personResult.data?.find((person) => person.role === 'student')?.id || '')
+    setSelectedLearnerId((current) => current || (personResult.data as Person[] | null)?.find((person) => person.role === 'student')?.id || '')
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
     if (siteSettingsResult.data) {
       const settings = siteSettingsResult.data as SiteSettings
@@ -123,7 +129,7 @@ export default function AdminPage() {
     async function initializeWorkspace() {
       try { await loadData() }
       catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'We could not load the admin workspace.')
+        setErrorMessage(formatErrorMessage(error, 'We could not load the admin workspace.'))
         setAccess('denied')
       }
     }
@@ -145,7 +151,7 @@ export default function AdminPage() {
       await loadData()
       return true
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'The change could not be saved.')
+      setErrorMessage(formatErrorMessage(error, 'The change could not be saved.'))
       return false
     } finally { setBusy(false) }
   }
@@ -347,7 +353,7 @@ export default function AdminPage() {
   const learners = people.filter((person) => person.role === 'student')
   const studentCount = learners.length
   const instructorCount = people.filter((person) => person.role === 'instructor').length
-  const filteredLearners = learners.filter((person) => `${person.full_name} ${person.email} ${person.phone_number}`.toLowerCase().includes(learnerSearch.trim().toLowerCase()))
+  const filteredLearners = learners.filter((person) => `${person.full_name} ${person.email}`.toLowerCase().includes(learnerSearch.trim().toLowerCase()))
   const selectedLearner = learners.find((person) => person.id === selectedLearnerId) ?? null
   const selectedLearnerEnrollments = courseEnrollments.filter((enrollment) => enrollment.student_id === selectedLearnerId)
   const selectedLearnerSessions = sessions.filter((session) => {
@@ -393,10 +399,10 @@ export default function AdminPage() {
         </>}
 
         {view === 'learners' && <>
-          <section className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-extrabold">Learners and session progress</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">View learner account details, course access, completed lessons, quick-check attempts, study time, and recent activity.</p></div><button type="button" onClick={() => void loadData().catch((error) => setErrorMessage(error instanceof Error ? error.message : 'Could not refresh learner data.'))} className="rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-white"><RefreshCw className="mr-1.5 inline h-3.5 w-3.5"/>Refresh learner data</button></section>
+          <section className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-extrabold">Learners and session progress</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">View learner account details, course access, completed lessons, quick-check attempts, study time, and recent activity.</p></div><button type="button" onClick={() => void loadData().catch((error) => setErrorMessage(formatErrorMessage(error, 'Could not refresh learner data.')))} className="rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-white"><RefreshCw className="mr-1.5 inline h-3.5 w-3.5"/>Refresh learner data</button></section>
           <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.7fr)]">
             <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-              <div className="border-b border-stone-100 p-4"><h3 className="font-bold">Registered learners <span className="text-sm font-medium text-stone-500">({learners.length})</span></h3><label className="relative mt-3 block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"/><input aria-label="Search learners" value={learnerSearch} onChange={(event) => setLearnerSearch(event.target.value)} placeholder="Search name, email, phone" className={`${inputClass} pl-9`}/></label></div>
+              <div className="border-b border-stone-100 p-4"><h3 className="font-bold">Registered learners <span className="text-sm font-medium text-stone-500">({learners.length})</span></h3><label className="relative mt-3 block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"/><input aria-label="Search learners" value={learnerSearch} onChange={(event) => setLearnerSearch(event.target.value)} placeholder="Search name or email" className={`${inputClass} pl-9`}/></label></div>
               <div className="max-h-[70vh] divide-y divide-stone-100 overflow-y-auto">{filteredLearners.map((learner) => {
                 const completed = learnerProgress.filter((progress) => progress.student_id === learner.id && progress.completed).length
                 const total = sessions.filter((session) => courseEnrollments.some((enrollment) => enrollment.student_id === learner.id && enrollment.course_id === modules.find((module) => module.id === session.module_id)?.course_id)).length
@@ -405,7 +411,7 @@ export default function AdminPage() {
             </section>
 
             {selectedLearner ? <div className="min-w-0 space-y-4">
-              <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Learner account</p><h3 className="mt-1 text-xl font-extrabold">{selectedLearner.full_name}</h3><p className="mt-1 text-xs text-stone-500">Account ID · {selectedLearner.id}</p></div><span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">{selectedLearner.xp} XP</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"><p className="flex min-w-0 items-center gap-2 text-sm text-stone-700"><Mail className="h-4 w-4 shrink-0 text-emerald-700"/><span className="truncate">{selectedLearner.email}</span></p><p className="flex items-center gap-2 text-sm text-stone-700"><Phone className="h-4 w-4 shrink-0 text-emerald-700"/>{selectedLearner.phone_number}</p><p className="flex items-center gap-2 text-sm text-stone-700"><MapPin className="h-4 w-4 shrink-0 text-emerald-700"/>{selectedLearner.location}</p><p className="text-sm text-stone-700">Age · {selectedLearner.age}</p><p className="flex items-center gap-2 text-sm text-stone-700"><CalendarDays className="h-4 w-4 shrink-0 text-emerald-700"/>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</p></div></section>
+              <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Learner account</p><h3 className="mt-1 text-xl font-extrabold">{selectedLearner.full_name}</h3><p className="mt-1 text-xs text-stone-500">Account ID · {selectedLearner.id}</p></div><span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">{selectedLearner.xp} XP</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"><p className="flex min-w-0 items-center gap-2 text-sm text-stone-700"><Mail className="h-4 w-4 shrink-0 text-emerald-700"/><span className="truncate">{selectedLearner.email}</span></p><p className="text-sm text-stone-700">Age · {selectedLearner.age ?? 'Not provided'}</p><p className="flex items-center gap-2 text-sm text-stone-700"><CalendarDays className="h-4 w-4 shrink-0 text-emerald-700"/>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</p></div></section>
 
               {(() => {
                 const completedCount = selectedLearnerSessions.filter((session) => learnerProgress.some((progress) => progress.student_id === selectedLearner.id && progress.session_id === session.id && progress.completed)).length
