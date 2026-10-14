@@ -10,15 +10,17 @@ interface Message {
 
 export default function AIChatMentor({
   currentCode,
-  sessionTitle
+  sessionTitle,
+  lessonContent
 }: {
   currentCode: string
   sessionTitle: string
+  lessonContent: string
 }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'ai',
-      content: `👋 Hi! I'm your Google Gemini Layman Python Mentor. Ask me anything about this lesson or your code (e.g. "What does int() do?", "Why use f-strings?")!`
+      content: `👋 Hi! I’m your Python learning mentor. Ask me about this lesson or paste a question about your code. I’ll explain unfamiliar terms as we go.`
     }
   ])
   const [input, setInput] = useState('')
@@ -33,27 +35,32 @@ export default function AIChatMentor({
     setIsLoading(true)
 
     try {
-      // Call Gemini API Route
       const res = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: userQ,
           code: currentCode,
-          sessionTitle
+          sessionTitle,
+          lessonContent,
+          history: messages.slice(-10).map(({ role, content }) => ({ role, content }))
         })
       })
 
-      const data = await res.json()
-      const reply = data.reply || 'An f-string lets you put variables directly inside `{}` instead of using plus signs!'
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
+        const reason = typeof data.error === 'string' ? data.error : 'The mentor could not prepare a reply.'
+        throw new Error(reason)
+      }
 
-      setMessages((prev) => [...prev, { role: 'ai', content: reply }])
-    } catch {
+      setMessages((prev) => [...prev, { role: 'ai', content: data.reply }])
+    } catch (error) {
+      setInput(userQ)
       setMessages((prev) => [
         ...prev,
         {
           role: 'ai',
-          content: 'Think of variables like labeled jars on a kitchen shelf. You store a value inside, and whenever you write the jar label, Python grabs what is inside!'
+          content: `I couldn’t get a reply just now. ${error instanceof Error ? error.message : 'Please try again.'} Your question is still in the box so you can retry.`
         }
       ])
     } finally {
@@ -67,9 +74,9 @@ export default function AIChatMentor({
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900 border-b border-white/5">
         <div className="flex items-center gap-2 text-purple-400 font-bold">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Gemini 3.6 Flash Layman Mentor</span>
+          <span>Python learning mentor</span>
         </div>
-        <span className="text-[10px] text-emerald-400 font-medium">24/7 Socratic Mode</span>
+        <span className="text-[10px] text-emerald-400 font-medium">Beginner friendly</span>
       </div>
 
       {/* Messages Scroll Area */}
@@ -85,7 +92,7 @@ export default function AIChatMentor({
               </div>
             )}
             <div
-              className={`p-2.5 rounded-xl max-w-[85%] leading-relaxed ${
+              className={`p-2.5 rounded-xl max-w-[85%] whitespace-pre-wrap break-words leading-relaxed ${
                 m.role === 'user'
                   ? 'bg-emerald-500/20 border border-emerald-500/30 text-white rounded-br-none'
                   : 'bg-slate-900 border border-white/5 text-slate-200 rounded-bl-none'
@@ -102,7 +109,7 @@ export default function AIChatMentor({
         ))}
         {isLoading && (
           <div className="flex items-center gap-2 text-purple-400 text-xs py-1 animate-pulse font-mono">
-            <Bot className="w-3.5 h-3.5" /> Thinking of a crystal-clear layman explanation...
+            <Bot className="w-3.5 h-3.5" /> Reading your question and lesson...
           </div>
         )}
       </div>

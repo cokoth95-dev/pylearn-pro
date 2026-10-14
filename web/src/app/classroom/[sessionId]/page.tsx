@@ -298,7 +298,7 @@ function ClassroomContent() {
             <p className="mt-3 flex items-center gap-1 text-[11px] text-slate-400"><Clock className="h-3 w-3"/>Time in this lesson: {Math.floor(secondsSpent / 60)} min</p>
           </>}
           {tab === 'visualizer' && <MemoryVisualizer code={code} stdout={terminalOutput}/>}
-          {tab === 'ai' && <AIChatMentor currentCode={code} sessionTitle={lesson.title}/>}
+          {tab === 'ai' && <AIChatMentor currentCode={code} sessionTitle={lesson.title} lessonContent={lesson.content_markdown}/>}
         </div>
       </section>
     </main>
