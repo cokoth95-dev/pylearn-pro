@@ -2,6 +2,12 @@
 /*
 !/web
 !/web/**
+/web/node_modules
+/web/**/node_modules
+/web/.next
+/web/**/.next
+/web/.vercel
+/web/**/.vercel
 /web/.env*
 /web/**/.env*
 /web/.local-set-auth-password.mjs
