@@ -1,0 +1,7 @@
+# This repository contains several apps and local data. Deploy only the Vercel app.
+/*
+!/web
+!/web/**
+/web/.env*
+/web/**/.env*
+/web/.local-set-auth-password.mjs
