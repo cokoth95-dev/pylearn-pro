@@ -5,16 +5,19 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
-import { BookOpen, CheckCircle2, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Plus, RefreshCw, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
+import { BookOpen, CalendarDays, CheckCircle2, Clock3, CreditCard, FileText, GraduationCap, Image as ImageIcon, LayoutDashboard, LoaderCircle, LockKeyhole, Mail, MapPin, Phone, Plus, RefreshCw, Search, ShieldCheck, Users, type LucideIcon } from 'lucide-react'
 
 type Course = { id: string; slug: string; title: string; language_code: string; description: string; status: 'draft' | 'published' | 'archived' }
 type Module = { id: number; course_id: string; month_number: number; title: string; tagline: string | null; description: string | null; is_free: boolean; order_index: number; status: 'draft' | 'published' | 'archived' }
 type Session = { id: number; module_id: number; session_number: number; title: string; analogy_physical: string; content_markdown: string; starter_code: string; hints: string[]; xp_reward: number; duration_minutes: number; quick_check: { question?: string; options?: string[] } }
 type LessonDraft = { session_number: number; title: string; analogy: string; content: string; starterCode: string; hints: string[]; xp: number; duration: number; question: string; options: string[]; correctOption: number; explanation: string }
 type LessonAnswer = { correctOption: number; explanation: string }
-type Person = { id: string; full_name: string; role: 'student' | 'instructor' | 'admin'; created_at: string }
+type Person = { id: string; full_name: string; email: string; phone_number: string; location: string; age: number; xp: number; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
-type View = 'overview' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments' | 'admissions'
+type LearnerProgress = { student_id: string; session_id: number; completed: boolean; completed_at: string | null; timer_seconds_spent: number; last_accessed: string }
+type LearnerAttempt = { student_id: string; session_id: number; correct: boolean; attempted_at: string }
+type CourseEnrollment = { course_id: string; student_id: string; plan: string; status: string; started_at: string; paid_through: string | null }
+type View = 'overview' | 'learners' | 'courses' | 'curriculum' | 'instructors' | 'hero' | 'payments' | 'admissions'
 type SiteSettings = { hero_image_url: string | null; hero_image_opacity: number; hero_media_type: 'image' | 'video' }
 type PaymentRequest = { id: string; student_id: string; course_id: string; purchase_type: 'monthly' | 'full_course'; target_month: number | null; amount_kes: number; receipt_suffix: string; payer_phone: string; status: 'pending' | 'confirmed' | 'declined'; decline_reason: string | null; created_at: string }
 type PaymentPricing = { monthly_amount_kes: number; full_course_amount_kes: number; full_course_regular_amount_kes: number; monthly_amount_usd: number; full_course_amount_usd: number; full_course_regular_amount_usd: number }
@@ -36,6 +39,11 @@ export default function AdminPage() {
   const [modules, setModules] = useState<Module[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [people, setPeople] = useState<Person[]>([])
+  const [learnerProgress, setLearnerProgress] = useState<LearnerProgress[]>([])
+  const [learnerAttempts, setLearnerAttempts] = useState<LearnerAttempt[]>([])
+  const [courseEnrollments, setCourseEnrollments] = useState<CourseEnrollment[]>([])
+  const [selectedLearnerId, setSelectedLearnerId] = useState('')
+  const [learnerSearch, setLearnerSearch] = useState('')
   const [courseInstructors, setCourseInstructors] = useState<CourseInstructor[]>([])
   const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28, hero_media_type: 'image' })
   const [heroUrlDraft, setHeroUrlDraft] = useState('')
@@ -62,25 +70,32 @@ export default function AdminPage() {
     if (profileError) throw profileError
     if (profile?.role !== 'admin') { setAccess('denied'); return }
 
-    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult] = await Promise.all([
+    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult] = await Promise.all([
       supabase.from('courses').select('id,slug,title,language_code,description,status').order('created_at'),
       supabase.from('modules').select('id,course_id,month_number,title,tagline,description,is_free,order_index,status').order('course_id').order('month_number').order('order_index'),
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
-      supabase.from('profiles').select('id,full_name,role,created_at').order('full_name'),
+      supabase.from('profiles').select('id,full_name,email,phone_number,location,age,xp,role,created_at').order('full_name'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
+      supabase.from('user_progress').select('student_id,session_id,completed,completed_at,timer_seconds_spent,last_accessed').order('last_accessed', { ascending: false }),
+      supabase.from('session_quick_check_attempts').select('student_id,session_id,correct,attempted_at').order('attempted_at', { ascending: false }),
+      supabase.from('course_enrollments').select('course_id,student_id,plan,status,started_at,paid_through').order('started_at', { ascending: false }),
       supabase.from('site_settings').select('hero_image_url,hero_image_opacity,hero_media_type').eq('id', 'main').maybeSingle(),
       supabase.from('payment_settings').select('payments_enabled,monthly_payments_enabled,full_course_payments_enabled,paybill_number,account_number,monthly_amount_kes,full_course_amount_kes,full_course_regular_amount_kes,monthly_amount_usd,full_course_amount_usd,full_course_regular_amount_usd,usd_kes_rate,usd_kes_rate_date,usd_kes_rate_source').eq('id', true).maybeSingle(),
       supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false }),
       supabase.from('admission_document_versions').select('version,title,content_markdown,requires_reacceptance,published_at').order('version', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('admission_document_draft').select('title,content_markdown').eq('id', true).maybeSingle(),
     ])
-    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult]) {
+    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult]) {
       if (result.error) throw result.error
     }
     setCourses((courseResult.data ?? []) as Course[])
     setModules((moduleResult.data ?? []) as Module[])
     setSessions((sessionResult.data ?? []) as Session[])
     setPeople((personResult.data ?? []) as Person[])
+    setLearnerProgress((learnerProgressResult.data ?? []) as LearnerProgress[])
+    setLearnerAttempts((learnerAttemptsResult.data ?? []) as LearnerAttempt[])
+    setCourseEnrollments((enrollmentResult.data ?? []) as CourseEnrollment[])
+    setSelectedLearnerId((current) => current || personResult.data?.find((person) => person.role === 'student')?.id || '')
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
     if (siteSettingsResult.data) {
       const settings = siteSettingsResult.data as SiteSettings
@@ -329,14 +344,24 @@ export default function AdminPage() {
 
   const selectedCourseRow = courses.find((course) => course.id === selectedCourse)
   const selectedCourseModules = modules.filter((module) => module.course_id === selectedCourse)
-  const studentCount = people.filter((person) => person.role === 'student').length
+  const learners = people.filter((person) => person.role === 'student')
+  const studentCount = learners.length
   const instructorCount = people.filter((person) => person.role === 'instructor').length
+  const filteredLearners = learners.filter((person) => `${person.full_name} ${person.email} ${person.phone_number}`.toLowerCase().includes(learnerSearch.trim().toLowerCase()))
+  const selectedLearner = learners.find((person) => person.id === selectedLearnerId) ?? null
+  const selectedLearnerEnrollments = courseEnrollments.filter((enrollment) => enrollment.student_id === selectedLearnerId)
+  const selectedLearnerSessions = sessions.filter((session) => {
+    const courseId = modules.find((module) => module.id === session.module_id)?.course_id
+    return selectedLearnerEnrollments.some((enrollment) => enrollment.course_id === courseId)
+      || learnerProgress.some((progress) => progress.student_id === selectedLearnerId && progress.session_id === session.id)
+  })
 
   if (access === 'loading') return <main className="grid min-h-screen place-items-center bg-[#faf7f0] text-stone-700"><p className="flex items-center gap-2"><LoaderCircle className="h-4 w-4 animate-spin"/> Checking administrator access…</p></main>
   if (access === 'denied') return <main className="mx-auto grid min-h-screen max-w-xl place-items-center bg-[#faf7f0] p-6 text-stone-800"><section className="w-full rounded-3xl border border-stone-200 bg-white p-8 text-center shadow-sm"><LockKeyhole className="mx-auto mb-3 h-8 w-8 text-amber-700"/><h1 className="text-xl font-bold">Admin access required</h1><p className="mt-2 text-sm leading-6 text-stone-600">This page is for PyLearn Pro administrators. If you are the academy owner, your account must be promoted once in Supabase before you can enter.</p>{errorMessage && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-left text-xs text-rose-800">{errorMessage}</p>}<Link className="mt-5 inline-flex rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white" href="/dashboard">Back to learner dashboard</Link></section></main>
 
   const nav: { id: View; label: string; icon: LucideIcon }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'learners', label: `Learners${studentCount ? ` · ${studentCount}` : ''}`, icon: Users },
     { id: 'courses', label: 'Courses', icon: GraduationCap },
     { id: 'curriculum', label: 'Curriculum review', icon: BookOpen },
     { id: 'instructors', label: 'Instructors', icon: Users },
@@ -365,6 +390,42 @@ export default function AdminPage() {
             { label: 'Learners', value: studentCount, icon: CheckCircle2 },
           ].map(({ label, value, icon: Icon }) => <article key={label} className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><Icon className="h-5 w-5 text-emerald-700"/><p className="mt-4 text-sm text-stone-500">{label}</p><p className="mt-1 text-3xl font-bold">{value}</p></article>)}</div>
           <section className="rounded-2xl border border-stone-200 bg-white p-5"><h3 className="font-bold">Review queue</h3><div className="mt-3 divide-y divide-stone-100">{modules.filter((module) => module.status === 'draft').map((module) => <div key={module.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold">{module.title}</p><p className="text-xs text-stone-500">{courses.find((course) => course.id === module.course_id)?.title} · Month {module.month_number} · {module.tagline}</p></div><button onClick={() => { setSelectedCourse(module.course_id); setView('curriculum') }} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-50">Review week</button></div>)}{modules.every((module) => module.status !== 'draft') && <p className="py-3 text-sm text-stone-500">No draft weeks are waiting for review.</p>}</div></section>
+        </>}
+
+        {view === 'learners' && <>
+          <section className="flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-2xl font-extrabold">Learners and session progress</h2><p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">View learner account details, course access, completed lessons, quick-check attempts, study time, and recent activity.</p></div><button type="button" onClick={() => void loadData().catch((error) => setErrorMessage(error instanceof Error ? error.message : 'Could not refresh learner data.'))} className="rounded-xl border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-white"><RefreshCw className="mr-1.5 inline h-3.5 w-3.5"/>Refresh learner data</button></section>
+          <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.7fr)]">
+            <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+              <div className="border-b border-stone-100 p-4"><h3 className="font-bold">Registered learners <span className="text-sm font-medium text-stone-500">({learners.length})</span></h3><label className="relative mt-3 block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"/><input aria-label="Search learners" value={learnerSearch} onChange={(event) => setLearnerSearch(event.target.value)} placeholder="Search name, email, phone" className={`${inputClass} pl-9`}/></label></div>
+              <div className="max-h-[70vh] divide-y divide-stone-100 overflow-y-auto">{filteredLearners.map((learner) => {
+                const completed = learnerProgress.filter((progress) => progress.student_id === learner.id && progress.completed).length
+                const total = sessions.filter((session) => courseEnrollments.some((enrollment) => enrollment.student_id === learner.id && enrollment.course_id === modules.find((module) => module.id === session.module_id)?.course_id)).length
+                return <button key={learner.id} type="button" onClick={() => setSelectedLearnerId(learner.id)} className={`block w-full p-4 text-left transition hover:bg-emerald-50 ${selectedLearnerId === learner.id ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : ''}`}><span className="block truncate text-sm font-bold text-stone-900">{learner.full_name}</span><span className="mt-1 block truncate text-xs text-stone-500">{learner.email}</span><span className="mt-2 flex items-center justify-between gap-2 text-[11px] text-stone-500"><span>{new Date(learner.created_at).toLocaleDateString()}</span><span>{completed} complete{total ? ` · ${total} in enrolled courses` : ''}</span></span></button>
+              })}{filteredLearners.length === 0 && <p className="p-5 text-sm text-stone-500">{learners.length ? 'No learner matches that search.' : 'No learner accounts have signed up yet.'}</p>}</div>
+            </section>
+
+            {selectedLearner ? <div className="min-w-0 space-y-4">
+              <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wide text-emerald-800">Learner account</p><h3 className="mt-1 text-xl font-extrabold">{selectedLearner.full_name}</h3><p className="mt-1 text-xs text-stone-500">Account ID · {selectedLearner.id}</p></div><span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-900">{selectedLearner.xp} XP</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3"><p className="flex min-w-0 items-center gap-2 text-sm text-stone-700"><Mail className="h-4 w-4 shrink-0 text-emerald-700"/><span className="truncate">{selectedLearner.email}</span></p><p className="flex items-center gap-2 text-sm text-stone-700"><Phone className="h-4 w-4 shrink-0 text-emerald-700"/>{selectedLearner.phone_number}</p><p className="flex items-center gap-2 text-sm text-stone-700"><MapPin className="h-4 w-4 shrink-0 text-emerald-700"/>{selectedLearner.location}</p><p className="text-sm text-stone-700">Age · {selectedLearner.age}</p><p className="flex items-center gap-2 text-sm text-stone-700"><CalendarDays className="h-4 w-4 shrink-0 text-emerald-700"/>Joined {new Date(selectedLearner.created_at).toLocaleDateString()}</p></div></section>
+
+              {(() => {
+                const completedCount = selectedLearnerSessions.filter((session) => learnerProgress.some((progress) => progress.student_id === selectedLearner.id && progress.session_id === session.id && progress.completed)).length
+                const trackedSeconds = learnerProgress.filter((progress) => progress.student_id === selectedLearner.id).reduce((sum, progress) => sum + progress.timer_seconds_spent, 0)
+                const lastActivity = learnerProgress.filter((progress) => progress.student_id === selectedLearner.id).map((progress) => progress.last_accessed).sort().at(-1)
+                return <div className="grid gap-3 sm:grid-cols-3"><article className="rounded-xl border border-stone-200 bg-white p-4"><p className="text-xs text-stone-500">Sessions completed</p><p className="mt-1 text-2xl font-extrabold">{completedCount}<span className="text-sm font-semibold text-stone-500"> / {selectedLearnerSessions.length}</span></p></article><article className="rounded-xl border border-stone-200 bg-white p-4"><p className="text-xs text-stone-500">Recorded study time</p><p className="mt-1 text-2xl font-extrabold">{Math.floor(trackedSeconds / 3600)}h {Math.floor((trackedSeconds % 3600) / 60)}m</p></article><article className="rounded-xl border border-stone-200 bg-white p-4"><p className="text-xs text-stone-500">Last lesson activity</p><p className="mt-1 text-sm font-bold">{lastActivity ? new Date(lastActivity).toLocaleString() : 'No lesson activity yet'}</p></article></div>
+              })()}
+
+              <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><h4 className="font-bold">Course access</h4><div className="mt-3 flex flex-wrap gap-2">{selectedLearnerEnrollments.map((enrollment) => <span key={enrollment.course_id} className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs"><strong>{courses.find((course) => course.id === enrollment.course_id)?.title ?? 'Course'}</strong><span className="ml-2 text-stone-600">{enrollment.plan.replaceAll('_', ' ')} · {enrollment.status}</span></span>)}{selectedLearnerEnrollments.length === 0 && <p className="text-sm text-stone-500">No course enrollment is recorded. Any lessons with saved progress are still listed below.</p>}</div></section>
+
+              <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm"><div className="border-b border-stone-100 p-5"><h4 className="font-bold">Session progress</h4><p className="mt-1 text-xs text-stone-500">Quick-check counts show correct and incorrect submitted answers. Study time is recorded by lesson.</p></div><div className="divide-y divide-stone-100">{selectedLearnerSessions.map((session) => {
+                const module = modules.find((item) => item.id === session.module_id)
+                const course = courses.find((item) => item.id === module?.course_id)
+                const progress = learnerProgress.find((item) => item.student_id === selectedLearner.id && item.session_id === session.id)
+                const attempts = learnerAttempts.filter((attempt) => attempt.student_id === selectedLearner.id && attempt.session_id === session.id)
+                const correctAttempts = attempts.filter((attempt) => attempt.correct).length
+                return <article key={session.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div className="min-w-48 flex-1"><p className="text-[11px] font-semibold text-stone-500">{course?.title ?? 'Course'} · Month {module?.month_number ?? '—'} · Session {session.session_number}</p><h5 className="mt-1 text-sm font-bold">{session.title}</h5><p className="mt-1 flex items-center gap-1 text-[11px] text-stone-500"><Clock3 className="h-3 w-3"/>{Math.floor((progress?.timer_seconds_spent ?? 0) / 60)} min recorded{progress?.last_accessed ? ` · Active ${new Date(progress.last_accessed).toLocaleString()}` : ''}</p></div><div className="flex items-center gap-3"><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${progress?.completed ? 'bg-emerald-100 text-emerald-900' : progress ? 'bg-amber-100 text-amber-900' : 'bg-stone-100 text-stone-600'}`}>{progress?.completed ? 'Completed' : progress ? 'In progress' : 'Not started'}</span><span className="min-w-24 text-right text-[11px] text-stone-600">{attempts.length} check{attempts.length === 1 ? '' : 's'} · {correctAttempts} correct</span></div></article>
+              })}{selectedLearnerSessions.length === 0 && <p className="p-5 text-sm text-stone-500">No enrolled courses or lesson activity has been recorded for this learner.</p>}</div></section>
+            </div> : <section className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-stone-300 bg-white p-6 text-center text-sm text-stone-500">Choose a learner to view their account and session history.</section>}
+          </div>
         </>}
 
         {view === 'courses' && <>
