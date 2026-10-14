@@ -119,13 +119,40 @@ function ClassroomContent() {
   const [showTraceback, setShowTraceback] = useState(false)
   const supabase = useMemo(() => createClient(), [])
   const editorHostRef = useRef<HTMLDivElement | null>(null)
-  const editorRef = useRef<{ layout: () => void } | null>(null)
+  const editorRef = useRef<{ layout: () => void; setValue: (value: string) => void } | null>(null)
+  const initialEditorCodeRef = useRef('')
 
-  const handleEditorMount = useCallback((editor: { layout: () => void }) => {
+  const handleEditorMount = useCallback((editor: { layout: () => void; setValue: (value: string) => void }) => {
     editorRef.current = editor
     editor.layout()
     requestAnimationFrame(() => editor.layout())
   }, [])
+
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    setCode(value ?? '')
+  }, [])
+
+  const editorOptions = useMemo(() => ({
+    fontSize: 14,
+    fontFamily: "Consolas, 'Courier New', monospace",
+    fontLigatures: false,
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    scrollBeyondLastColumn: 8,
+    automaticLayout: true,
+    tabSize: 4,
+    lineNumbers: 'on' as const,
+    lineNumbersMinChars: 3,
+    padding: { top: 14, bottom: 14 },
+    cursorStyle: 'line' as const,
+    cursorBlinking: 'blink' as const,
+    cursorWidth: 2,
+    readOnly: false,
+    renderLineHighlight: 'all' as const,
+    mouseStyle: 'text' as const,
+    glyphMargin: false,
+    wordWrap: 'off' as const,
+  }), [])
 
   useEffect(() => {
     const host = editorHostRef.current
@@ -162,6 +189,7 @@ function ClassroomContent() {
         if (!active) return
         setLesson(loaded)
         const draft = progressRow?.draft_code ?? loaded.starter_code ?? ''
+        initialEditorCodeRef.current = draft
         setCode(draft); setSavedCode(draft); setSaveState('saved')
         setSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
         setSavedSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
@@ -208,6 +236,12 @@ function ClassroomContent() {
     setIsExecuting(false)
   }, [code, runPython])
 
+  const handleResetCode = useCallback(() => {
+    const starterCode = lesson?.starter_code ?? ''
+    editorRef.current?.setValue(starterCode)
+    setCode(starterCode)
+  }, [lesson])
+
   async function submitQuickCheck() {
     if (!lesson || selectedOption === null || isSubmittingCheck) return
     setIsSubmittingCheck(true); setCheckResult(null)
@@ -234,7 +268,7 @@ function ClassroomContent() {
   return <div className="flex min-h-screen flex-col bg-[#090d16] text-slate-100">
     <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-900/90 px-4 py-2 backdrop-blur-xl md:px-6">
       <div className="flex min-w-0 items-center gap-3"><Link href="/dashboard" className="flex shrink-0 items-center gap-1 text-xs text-slate-300 hover:text-white"><ArrowLeft className="h-4 w-4"/> Dashboard</Link><div className="hidden h-5 border-l border-white/20 sm:block"/><div className="min-w-0"><div className="truncate text-sm font-bold text-white">{lesson.title}</div><div className="text-[11px] text-slate-400">Month {lesson.modules.month_number} · Session {lesson.session_number} · {lesson.duration_minutes} minutes</div></div></div>
-      <div className="flex items-center gap-2"><span className="hidden text-xs text-slate-400 sm:inline">{saveState === 'saving' ? 'Saving draft…' : saveState === 'error' ? 'Draft not saved' : 'Draft saved'}</span><ThemeToggle/><AccountMenu dark/><button onClick={() => setCode(lesson.starter_code || '')} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200"><RotateCcw className="mr-1 inline h-3.5 w-3.5"/>Reset</button><button onClick={handleRunCode} disabled={!isReady || isExecuting} className="rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50"><Play className="mr-1 inline h-3.5 w-3.5"/>{isPyodideLoading ? 'Loading Python…' : isExecuting ? 'Running…' : 'Run code'}</button></div>
+      <div className="flex items-center gap-2"><span className="hidden text-xs text-slate-400 sm:inline">{saveState === 'saving' ? 'Saving draft…' : saveState === 'error' ? 'Draft not saved' : 'Draft saved'}</span><ThemeToggle/><AccountMenu dark/><button onClick={handleResetCode} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200"><RotateCcw className="mr-1 inline h-3.5 w-3.5"/>Reset</button><button onClick={handleRunCode} disabled={!isReady || isExecuting} className="rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50"><Play className="mr-1 inline h-3.5 w-3.5"/>{isPyodideLoading ? 'Loading Python…' : isExecuting ? 'Running…' : 'Run code'}</button></div>
     </header>
 
     <main className="mx-auto grid w-full max-w-[1600px] flex-1 grid-cols-1 gap-4 p-3 lg:grid-cols-[minmax(280px,0.95fr)_minmax(360px,1.1fr)_minmax(300px,0.95fr)] lg:p-5">
@@ -247,7 +281,7 @@ function ClassroomContent() {
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950">
         <div className="flex items-center justify-between border-b border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300"><span>Python practice editor</span><span className="text-emerald-300">Browser practice · no grade saved</span></div>
-        <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1"><Editor height="100%" width="100%" defaultLanguage="python" theme="vs-dark" value={code} onChange={(value) => setCode(value ?? '')} onMount={handleEditorMount} options={{fontSize:14,fontFamily:"Consolas, 'Courier New', monospace",fontLigatures:false,minimap:{enabled:false},scrollBeyondLastLine:false,scrollBeyondLastColumn:8,automaticLayout:true,tabSize:4,lineNumbers:'on',lineNumbersMinChars:3,padding:{top:14,bottom:14},cursorStyle:'line',cursorBlinking:'blink',cursorWidth:2,readOnly:false,renderLineHighlight:'all',mouseStyle:'text',glyphMargin:false,wordWrap:'off'}}/></div>
+        <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1"><Editor height="100%" width="100%" defaultLanguage="python" defaultValue={initialEditorCodeRef.current} theme="vs-dark" onChange={handleEditorChange} onMount={handleEditorMount} options={editorOptions}/></div>
       </section>
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
