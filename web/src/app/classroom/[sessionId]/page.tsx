@@ -28,7 +28,7 @@ type Lesson = {
 }
 type QuickCheckAttempt = { selected_option: number; correct: boolean; attempted_at: string }
 type QuickCheckResult = { correct: boolean; explanation: string; session_completed_now: boolean; xp_awarded: number }
-type Tab = 'inputs' | 'terminal' | 'visualizer' | 'ai'
+type Tab = 'inputHelp' | 'terminal' | 'visualizer' | 'ai'
 
 function inlineText(text: string) {
   const chunks = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
@@ -41,17 +41,13 @@ function inlineText(text: string) {
 
 function explainPythonError(traceback: string) {
   const lastLine = traceback.trim().split('\n').filter(Boolean).at(-1) ?? 'Python could not run this code.'
-  if (lastLine.startsWith('EOFError')) return 'This program asked for more answers than you entered. Add one answer for each input() question in the Answers tab, in the same order, then run the code again.'
+  if (lastLine.startsWith('EOFError')) return 'You cancelled an input question. Run the code again and answer the browser prompt to continue.'
   if (lastLine.startsWith('SyntaxError') || lastLine.startsWith('IndentationError')) return 'Python could not read the code. Check the spelling, quotes, brackets, colon, and indentation.'
   if (lastLine.startsWith('NameError')) return 'Python cannot find a name in your code. Check the spelling and make sure the variable or function is defined before it is used.'
   if (lastLine.startsWith('TypeError')) return 'These values do not work together in this operation. Check their types; typed answers often need int(...) before math.'
   if (lastLine.startsWith('ValueError')) return 'Python could not turn this answer into the requested value. Check that the typed answer matches the question, such as digits for a whole number.'
   if (lastLine.startsWith('ZeroDivisionError')) return 'The program tried to divide by zero. Check the number used as the divisor.'
   return `Python stopped with an error: ${lastLine}`
-}
-
-function readProgramInputs(value: string) {
-  return value === '' ? [] : value.replace(/\r\n?/g, '\n').split('\n')
 }
 
 // Render the small, known Markdown subset used by lesson content as React text.
@@ -111,9 +107,8 @@ function ClassroomContent() {
   const [terminalOutput, setTerminalOutput] = useState('Run your Python code here. Browser practice does not submit a grade.')
   const [terminalError, setTerminalError] = useState('')
   const [fullTraceback, setFullTraceback] = useState('')
-  const [inputValues, setInputValues] = useState('')
   const [isExecuting, setIsExecuting] = useState(false)
-  const [tab, setTab] = useState<Tab>('inputs')
+  const [tab, setTab] = useState<Tab>('inputHelp')
   const [attempts, setAttempts] = useState<QuickCheckAttempt[]>([])
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [checkResult, setCheckResult] = useState<QuickCheckResult | null>(null)
@@ -206,12 +201,12 @@ function ClassroomContent() {
   const handleRunCode = useCallback(async () => {
     setIsExecuting(true); setShowTraceback(false); setTab('terminal')
     setTerminalError(''); setFullTraceback(''); setTerminalOutput('Running Python in this browser…')
-    const result = await runPython(code, readProgramInputs(inputValues))
+    const result = await runPython(code)
     setFullTraceback(result.stderr)
     setTerminalError(result.stderr ? explainPythonError(result.stderr) : '')
     setTerminalOutput(result.stdout || (result.stderr ? '' : 'Your program finished without showing output.'))
     setIsExecuting(false)
-  }, [code, inputValues, runPython])
+  }, [code, runPython])
 
   async function submitQuickCheck() {
     if (!lesson || selectedOption === null || isSubmittingCheck) return
@@ -256,9 +251,9 @@ function ClassroomContent() {
       </section>
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
-        <div role="tablist" aria-label="Practice results" className="flex border-b border-white/10 bg-slate-900/80 text-xs">{([['inputs',Keyboard,'Answers'],['terminal',Terminal,'Output'],['visualizer',Layers,'Memory'],['ai',Sparkles,'Ask for help']] as const).map(([id, Icon, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 py-3 font-semibold ${tab === id ? 'border-b-2 border-emerald-400 text-emerald-300' : 'text-slate-400'}`}><Icon className="h-3.5 w-3.5 shrink-0"/><span className="truncate">{label}</span></button>)}</div>
+        <div role="tablist" aria-label="Practice results" className="flex border-b border-white/10 bg-slate-900/80 text-xs">{([['inputHelp',Keyboard,'How input works'],['terminal',Terminal,'Output'],['visualizer',Layers,'Memory'],['ai',Sparkles,'Ask for help']] as const).map(([id, Icon, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 py-3 font-semibold ${tab === id ? 'border-b-2 border-emerald-400 text-emerald-300' : 'text-slate-400'}`}><Icon className="h-3.5 w-3.5 shrink-0"/><span className="truncate">{label}</span></button>)}</div>
         <div className="flex-1 overflow-auto p-3">
-          {tab === 'inputs' && <section role="tabpanel" className="flex min-h-[320px] flex-col gap-3 rounded-xl border border-white/10 bg-slate-900/50 p-4"><div><h2 className="font-bold text-slate-100">Answers for <code className="font-mono text-emerald-300">input()</code> questions</h2><p className="mt-2 text-sm leading-6 text-slate-300">When your program reaches <code className="font-mono text-emerald-300">input()</code>, it uses the next answer from this list. Type one answer on each line, in the same order as the questions in your code. After you run the program, open Output to see the prompts, answers, and printed results.</p></div><label className="flex flex-1 flex-col gap-2 text-xs font-semibold text-slate-300">One answer per line<textarea aria-label="Answers for input questions, one per line" value={inputValues} onChange={(event) => setInputValues(event.target.value)} rows={8} className="min-h-40 flex-1 resize-y rounded-lg border border-white/10 bg-slate-950 p-3 font-mono text-sm text-slate-100 caret-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400" placeholder={'Example for two input() questions:\nAmina\n12'}/></label><p className="text-xs leading-5 text-slate-400">For one question, enter one answer. For two questions, enter two lines. A number typed here is still text; use <code className="font-mono text-emerald-300">int(...)</code> in Python if you need to calculate with it.</p></section>}
+          {tab === 'inputHelp' && <section role="tabpanel" className="flex min-h-[320px] flex-col gap-3 rounded-xl border border-white/10 bg-slate-900/50 p-4"><div><h2 className="font-bold text-slate-100">How <code className="font-mono text-emerald-300">input()</code> works</h2><p className="mt-2 text-sm leading-6 text-slate-300"><code className="font-mono text-emerald-300">input()</code> lets a program ask you a question and use your reply. Click Run code. When Python reaches an <code className="font-mono text-emerald-300">input()</code> line, your browser opens a small dialog showing the question. Type your answer and choose OK. If the program asks another question, a new dialog appears.</p></div><div className="rounded-lg border border-white/10 bg-slate-950 p-3"><p className="text-sm font-semibold text-slate-200">Example</p><pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-5 text-slate-300">{`name = input("What is your name? ")\nprint(f"Hello, {name}!")`}</pre></div><p className="text-sm leading-6 text-slate-300">After you answer, the program continues. Its questions, your replies, and anything it prints appear in the Output tab. The browser dialog is separate from the Output tab. Choosing Cancel stops the program; submitting an empty answer is allowed.</p><p className="text-xs leading-5 text-slate-400">An answer is text, even when you type digits. To use it in a calculation, convert it with <code className="font-mono text-emerald-300">int(input(...))</code>.</p></section>}
           {tab === 'terminal' && <>{terminalError && <div className="mb-2 rounded-xl border border-amber-300/30 bg-amber-100 p-3 text-sm text-amber-950" role="status"><strong className="block">Let’s fix this</strong>{terminalError}<div><button className="mt-1 underline" onClick={() => setShowTraceback((value) => !value)}>{showTraceback ? 'Hide full traceback' : 'Show full traceback'}</button></div>{showTraceback && <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-amber-300 pt-2 font-mono text-xs">{fullTraceback}</pre>}</div>}<pre className="max-h-56 min-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100">{terminalOutput}</pre>
             <div className="mt-5 rounded-xl border border-emerald-300/30 bg-emerald-50 p-4 text-stone-900"><div className="font-bold">Quick check · {attempts.length} attempt{attempts.length === 1 ? '' : 's'}</div><p className="mt-2 text-sm">{lesson.quick_check?.question ?? 'No quick check is available for this lesson.'}</p><div className="mt-3 space-y-2">{checkOptions.map((option, index) => <button key={index} disabled={completed || isSubmittingCheck} onClick={() => setSelectedOption(index)} className={`block w-full rounded-lg border p-2.5 text-left text-sm disabled:cursor-not-allowed ${selectedOption === index ? 'border-emerald-700 bg-emerald-100' : 'border-stone-300 bg-white hover:bg-stone-50'}`}><span className="mr-2 font-bold">{String.fromCharCode(65 + index)}.</span>{option}</button>)}</div>
               {checkResult && <div role="status" className={`mt-3 rounded-lg p-3 text-sm ${checkResult.correct ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>{checkResult.correct ? 'Correct — lesson complete. ' : 'Not quite. Try again. '}{checkResult.explanation}{checkResult.xp_awarded > 0 ? ` You earned ${checkResult.xp_awarded} XP.` : ''}</div>}

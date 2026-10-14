@@ -62,10 +62,7 @@ export function usePyodide() {
     loadPyodideScript()
   }, [])
 
-  const runPython = async (
-    code: string,
-    inputs: string[] = []
-  ): Promise<PyodideResult> => {
+  const runPython = async (code: string): Promise<PyodideResult> => {
     if (!pyodideRef.current) {
       return {
         stdout: '',
@@ -78,8 +75,9 @@ export function usePyodide() {
     const startTime = performance.now()
 
     try {
-      // Set up standard input and output interception
-      pyodide.globals.set('__input_queue__', inputs)
+      // Let Python's input() call the browser prompt with its own question.
+      // A null result means the learner pressed Cancel; an empty string is a valid answer.
+      pyodide.globals.set('__browser_prompt__', (message: string) => window.prompt(message))
       
       const runnerCode = `
 import sys
@@ -102,23 +100,25 @@ custom_err = WebStdout()
 sys.stdout = custom_out
 sys.stderr = custom_err
 
-# Override input() to read from our simulated input queue
-_inputs_iter = iter(__input_queue__)
+# Give each run its own input() implementation so we do not change Python's
+# shared builtins for later runs.
+import builtins as _builtins
 def custom_input(prompt=""):
+    answer = __browser_prompt__(str(prompt))
+    if answer is None:
+        raise EOFError("Input was cancelled.")
+    # Show the question and answer in Output after the browser dialog closes.
     if prompt:
         custom_out.write(str(prompt))
-    try:
-        answer = next(_inputs_iter)
-        # A real terminal echoes what the learner types after the prompt.
-        custom_out.write(str(answer) + "\\n")
-        return answer
-    except StopIteration:
-        raise EOFError("No answer was provided for this input() question. Add an answer in Program inputs, one answer per line, then run the code again.")
+    custom_out.write(str(answer) + "\\n")
+    return str(answer)
 
-__builtins__.input = custom_input
+__user_builtins__ = dict(vars(_builtins))
+__user_builtins__["input"] = custom_input
+__user_globals__ = {"__name__": "__main__", "__builtins__": __user_builtins__}
 
 try:
-    exec(${JSON.stringify(code)}, {})
+    exec(${JSON.stringify(code)}, __user_globals__)
 except Exception as e:
     import traceback
     custom_err.write(traceback.format_exc())
@@ -129,7 +129,11 @@ finally:
 final_stdout = custom_out.get_output()
 final_stderr = custom_err.get_output()
 `
-      await pyodide.runPythonAsync(runnerCode)
+      try {
+        await pyodide.runPythonAsync(runnerCode)
+      } finally {
+        pyodide.globals.delete('__browser_prompt__')
+      }
 
       const stdout = pyodide.globals.get('final_stdout') || ''
       const stderr = pyodide.globals.get('final_stderr') || ''
