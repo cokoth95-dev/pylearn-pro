@@ -202,7 +202,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-xl">
-              Master Python in 4 months through intuitive everyday surroundings, live in-browser coding, and 24/7 Google Gemini AI mentoring.
+              Master Python in 4 months through intuitive everyday surroundings, live in-browser coding, and on-demand AI mentoring.
             </p>
 
             <div className="flex flex-wrap items-center gap-4 pt-4">
@@ -390,7 +390,7 @@ export default function HomePage() {
                 <ul className="mt-6 space-y-2.5 text-xs text-slate-300">
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Access to published Month 1 lessons</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> In-Browser Pyodide Code Sandbox</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Google Gemini AI Socratic Tutoring</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Beginner-friendly AI Python mentoring</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Quick checks and saved lesson progress</li>
                 </ul>
               </div>
@@ -493,7 +493,7 @@ export default function HomePage() {
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-4">
-              <span>Built with Next.js, Pyodide Wasm, Supabase & Google Gemini AI.</span>
+              <span>Built with Next.js, Pyodide Wasm, Supabase & AI learning services.</span>
               <Link className="underline hover:text-slate-300" href="/terms">Terms</Link>
               <Link className="underline hover:text-slate-300" href="/privacy">Privacy</Link>
             </div>

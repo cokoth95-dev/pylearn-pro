@@ -116,7 +116,7 @@ export default function HeroPlayground() {
           </pre>
           <div className="pt-3 mt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
             <span className="flex items-center gap-1 text-cyan-400">
-              <Sparkles className="w-3.5 h-3.5" /> 24/7 Gemini Layman AI Ready
+              <Sparkles className="w-3.5 h-3.5" /> Beginner-friendly AI tutor ready
             </span>
             <span className="text-emerald-400 font-medium">100% Free Sandbox</span>
           </div>

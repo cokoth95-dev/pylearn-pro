@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PyLearn Pro — Your Modern Python & AI Academy",
-  description: "Master Python in 4 Months through real-world surroundings, interactive in-browser IDE, and 24/7 Google Gemini AI tutoring.",
+  description: "Master Python through real-world examples, an interactive browser editor, and an on-demand AI learning mentor.",
 };
 
 export default function RootLayout({

@@ -10,7 +10,7 @@ import AIChatMentor from '@/components/classroom/AIChatMentor'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, Keyboard, Layers, Play, RotateCcw, Send, Sparkles, Terminal } from 'lucide-react'
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, Keyboard, Layers, Maximize2, Minimize2, Play, RotateCcw, Send, Sparkles, Terminal } from 'lucide-react'
 
 type Lesson = {
   id: number
@@ -109,6 +109,8 @@ function ClassroomContent() {
   const [fullTraceback, setFullTraceback] = useState('')
   const [isExecuting, setIsExecuting] = useState(false)
   const [tab, setTab] = useState<Tab>('inputHelp')
+  const [isEditorFullscreen, setIsEditorFullscreen] = useState(false)
+  const [wrapEditorLines, setWrapEditorLines] = useState(false)
   const [attempts, setAttempts] = useState<QuickCheckAttempt[]>([])
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [checkResult, setCheckResult] = useState<QuickCheckResult | null>(null)
@@ -119,6 +121,7 @@ function ClassroomContent() {
   const [showTraceback, setShowTraceback] = useState(false)
   const supabase = useMemo(() => createClient(), [])
   const editorHostRef = useRef<HTMLDivElement | null>(null)
+  const editorPanelRef = useRef<HTMLElementTagNameMap['section'] | null>(null)
   const editorRef = useRef<{ layout: () => void; setValue: (value: string) => void } | null>(null)
   const initialEditorCodeRef = useRef('')
 
@@ -151,8 +154,29 @@ function ClassroomContent() {
     renderLineHighlight: 'all' as const,
     mouseStyle: 'text' as const,
     glyphMargin: false,
-    wordWrap: 'off' as const,
-  }), [])
+    wordWrap: (wrapEditorLines ? 'on' : 'off') as 'on' | 'off',
+  }), [wrapEditorLines])
+
+  const toggleEditorFullscreen = useCallback(async () => {
+    const panel = editorPanelRef.current
+    if (!panel) return
+    try {
+      if (document.fullscreenElement === panel) await document.exitFullscreen()
+      else await panel.requestFullscreen()
+    } catch {
+      // Keep the regular editor available if the browser blocks fullscreen.
+    }
+  }, [])
+
+  useEffect(() => {
+    const syncFullscreenState = () => setIsEditorFullscreen(document.fullscreenElement === editorPanelRef.current)
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+    return () => document.removeEventListener('fullscreenchange', syncFullscreenState)
+  }, [])
+
+  useEffect(() => {
+    requestAnimationFrame(() => editorRef.current?.layout())
+  }, [isEditorFullscreen])
 
   useEffect(() => {
     const host = editorHostRef.current
@@ -227,6 +251,7 @@ function ClassroomContent() {
   }, [code, lesson, savedCode, savedSecondsSpent, saveState, secondsSpent, supabase])
 
   const handleRunCode = useCallback(async () => {
+    if (document.fullscreenElement === editorPanelRef.current) await document.exitFullscreen().catch(() => undefined)
     setIsExecuting(true); setShowTraceback(false); setTab('terminal')
     setTerminalError(''); setFullTraceback(''); setTerminalOutput('Running Python in this browser…')
     const result = await runPython(code)
@@ -279,8 +304,8 @@ function ClassroomContent() {
         {lesson.hints?.length ? <details className="mt-5 rounded-xl border border-stone-200 bg-white/70 p-4 text-sm text-stone-700"><summary className="cursor-pointer font-semibold">Hints if you need help</summary><ul className="mt-3 list-disc space-y-2 pl-5">{lesson.hints.map((hint, index) => <li key={index}>{hint}</li>)}</ul></details> : null}
       </section>
 
-      <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950">
-        <div className="flex items-center justify-between border-b border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300"><span>Python practice editor</span><span className="text-emerald-300">Browser practice · no grade saved</span></div>
+      <section ref={editorPanelRef} className={`flex min-h-[55vh] flex-col overflow-hidden border border-white/10 bg-slate-950 ${isEditorFullscreen ? 'h-dvh w-screen rounded-none p-3' : 'rounded-2xl'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300"><div className="flex items-center gap-3"><span>Python practice editor</span><span className="text-emerald-300">Browser practice · no grade saved</span></div><div className="flex items-center gap-2">{isEditorFullscreen && <button type="button" onClick={() => void handleRunCode()} disabled={!isReady || isExecuting} className="rounded-md bg-emerald-400 px-2.5 py-1.5 font-bold text-slate-950 disabled:opacity-50"><Play className="mr-1 inline h-3.5 w-3.5"/>{isExecuting ? 'Running…' : 'Run code'}</button>}<button type="button" onClick={() => setWrapEditorLines((value) => !value)} aria-pressed={wrapEditorLines} className="rounded-md border border-white/15 px-2.5 py-1.5 text-slate-200 hover:bg-white/10">{wrapEditorLines ? 'Turn line wrap off' : 'Wrap long lines'}</button><button type="button" onClick={() => void toggleEditorFullscreen()} aria-label={isEditorFullscreen ? 'Exit full screen editor' : 'Open full screen editor'} className="rounded-md border border-white/15 px-2.5 py-1.5 text-slate-200 hover:bg-white/10"><span className="flex items-center gap-1.5">{isEditorFullscreen ? <Minimize2 className="h-3.5 w-3.5"/> : <Maximize2 className="h-3.5 w-3.5"/>}{isEditorFullscreen ? 'Exit full screen' : 'Full screen'}</span></button></div></div>
         <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1"><Editor height="100%" width="100%" defaultLanguage="python" defaultValue={initialEditorCodeRef.current} theme="vs-dark" onChange={handleEditorChange} onMount={handleEditorMount} options={editorOptions}/></div>
       </section>
 

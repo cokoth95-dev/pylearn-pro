@@ -25,7 +25,7 @@ export default function FAQSection() {
     },
     {
       q: "What happens if my code doesn't work on an assignment?",
-      a: "Our integrated Google Gemini 3.6 Flash AI Tutor acts as your 24/7 personal coding mentor. It inspects your code, identifies where you got stuck, and offers gentle, Socratic hints using everyday analogies—helping you fix the problem without giving away the answer."
+      a: "Our Python AI mentor can explain lesson ideas and review the code in your practice editor. It tries available AI services in order and switches to a backup when one is busy or unavailable. Its explanations can be wrong, so compare them with your lesson and try the suggested code yourself."
     },
     {
       q: "Will I receive a verified certificate upon graduation?",

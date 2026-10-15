@@ -6,6 +6,8 @@ import { Sparkles, Send, Bot, User, HelpCircle } from 'lucide-react'
 interface Message {
   role: 'user' | 'ai'
   content: string
+  provider?: string
+  fallback?: boolean
 }
 
 export default function AIChatMentor({
@@ -53,7 +55,7 @@ export default function AIChatMentor({
         throw new Error(reason)
       }
 
-      setMessages((prev) => [...prev, { role: 'ai', content: data.reply }])
+      setMessages((prev) => [...prev, { role: 'ai', content: data.reply, provider: data.provider, fallback: data.fallback }])
     } catch (error) {
       setInput(userQ)
       setMessages((prev) => [
@@ -99,6 +101,7 @@ export default function AIChatMentor({
               }`}
             >
               {m.content}
+              {m.provider && <div className="mt-2 border-t border-white/10 pt-1 text-[10px] text-slate-400">Answered by {m.provider}{m.fallback ? ' after the first provider was unavailable' : ''}.</div>}
             </div>
             {m.role === 'user' && (
               <div className="p-1 rounded-md bg-emerald-500/20 text-emerald-300 shrink-0">
