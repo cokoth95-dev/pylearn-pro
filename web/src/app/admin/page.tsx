@@ -173,14 +173,14 @@ export default function AdminPage() {
     const month = Number(weekForm.month_number)
     const week = Number(weekForm.week_number)
     const title = weekForm.title.trim()
-    if (!title || month < 1 || month > 4 || week < 1 || week > 4) {
-      setErrorMessage('Enter a title and choose a month and week from 1 to 4.')
+    if (!title || month < 1 || month > 3 || week < 1 || week > 4) {
+      setErrorMessage('Enter a title, choose a month from 1 to 3, and choose a week from 1 to 4.')
       return
     }
     const saved = await perform(async () => await supabase.from('modules').insert({
       course_id: selectedCourse,
       month_number: month,
-      order_index: week,
+      order_index: (month - 1) * 4 + week,
       title,
       tagline: `Week ${week} · Sessions ${(week - 1) * 5 + 1}–${week * 5}`,
       description: weekForm.description.trim(),
@@ -450,7 +450,7 @@ export default function AdminPage() {
         {view === 'curriculum' && <>
           <section><h2 className="text-2xl font-extrabold">Curriculum review</h2><p className="mt-1 text-sm text-stone-600">Review the week and its lessons. Publishing a week makes its lessons available to entitled learners.</p></section>
           <label className="block max-w-xl text-xs font-semibold text-stone-600">Course<select className={`${inputClass} mt-1`} value={selectedCourse} onChange={(event) => setSelectedCourse(event.target.value)}>{courses.map((course) => <option key={course.id} value={course.id}>{course.title} ({course.status})</option>)}</select></label>
-          {selectedCourse && <form onSubmit={createWeek} className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm md:grid-cols-2"><h3 className="font-bold md:col-span-2">Add a draft week</h3><select className={inputClass} value={weekForm.month_number} onChange={(event) => setWeekForm((current) => ({ ...current, month_number: event.target.value }))}>{[1,2,3,4].map((month) => <option key={month} value={month}>Month {month}</option>)}</select><select className={inputClass} value={weekForm.week_number} onChange={(event) => setWeekForm((current) => ({ ...current, week_number: event.target.value }))}>{[1,2,3,4].map((week) => <option key={week} value={week}>Week {week}</option>)}</select><input required className={inputClass} placeholder="Week title" value={weekForm.title} onChange={(event) => setWeekForm((current) => ({ ...current, title: event.target.value }))}/><input className={inputClass} placeholder="Learning goal" value={weekForm.description} onChange={(event) => setWeekForm((current) => ({ ...current, description: event.target.value }))}/><button disabled={busy} className={buttonClass}><Plus className="h-4 w-4"/>Create draft week</button></form>}
+          {selectedCourse && <form onSubmit={createWeek} className="grid gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm md:grid-cols-2"><h3 className="font-bold md:col-span-2">Add a draft week</h3><select className={inputClass} value={weekForm.month_number} onChange={(event) => setWeekForm((current) => ({ ...current, month_number: event.target.value }))}>{[1,2,3].map((month) => <option key={month} value={month}>Month {month}</option>)}</select><select className={inputClass} value={weekForm.week_number} onChange={(event) => setWeekForm((current) => ({ ...current, week_number: event.target.value }))}>{[1,2,3,4].map((week) => <option key={week} value={week}>Week {week}</option>)}</select><input required className={inputClass} placeholder="Week title" value={weekForm.title} onChange={(event) => setWeekForm((current) => ({ ...current, title: event.target.value }))}/><input className={inputClass} placeholder="Learning goal" value={weekForm.description} onChange={(event) => setWeekForm((current) => ({ ...current, description: event.target.value }))}/><button disabled={busy} className={buttonClass}><Plus className="h-4 w-4"/>Create draft week</button></form>}
           <div className="space-y-4">{selectedCourseModules.map((module) => <ModuleCard key={module.id} module={module} sessions={sessions.filter((session) => session.module_id === module.id)} busy={busy} onStatus={(status) => perform(async () => await supabase.from('modules').update({ status }).eq('id', module.id), status === 'published' ? 'Week published for entitled learners.' : `Week moved to ${status}.`)} onGetLessonAnswer={getLessonAnswer} onSaveLesson={(sessionId, draft) => saveLesson(module.id, sessionId, draft)}/>)}</div>
           {selectedCourse && !selectedCourseModules.length && <p className="rounded-2xl border border-dashed border-stone-300 p-6 text-sm text-stone-500">This course has no weeks yet.</p>}
         </>}

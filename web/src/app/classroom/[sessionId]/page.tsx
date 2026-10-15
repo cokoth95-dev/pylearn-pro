@@ -10,7 +10,7 @@ import AIChatMentor from '@/components/classroom/AIChatMentor'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
 import { createClient } from '@/lib/supabase/client'
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, Keyboard, Layers, Maximize2, Minimize2, Play, RotateCcw, Send, Sparkles, Terminal } from 'lucide-react'
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronRight, Clock, FileCode2, Keyboard, Layers, Maximize2, Minimize2, Play, RotateCcw, Send, Sparkles, Terminal } from 'lucide-react'
 
 type Lesson = {
   id: number
@@ -24,8 +24,9 @@ type Lesson = {
   starter_code: string
   hints: string[] | null
   quick_check: { question?: string; options?: string[] }
-  modules: { id: number; title: string; month_number: number; course_id: string; status: string }
+  modules: { id: number; title: string; month_number: number; order_index: number; course_id: string; status: string }
 }
+type PracticeFile = { sessionId: number; title: string; monthNumber: number; weekNumber: number; sessionNumber: number }
 type QuickCheckAttempt = { selected_option: number; correct: boolean; attempted_at: string }
 type QuickCheckResult = { correct: boolean; explanation: string; session_completed_now: boolean; xp_awarded: number }
 type Tab = 'inputHelp' | 'terminal' | 'visualizer' | 'ai'
@@ -99,6 +100,7 @@ function ClassroomContent() {
   const sessionId = Number(params.sessionId)
   const { isReady, isLoading: isPyodideLoading, runPython } = usePyodide()
   const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [practiceFiles, setPracticeFiles] = useState<PracticeFile[]>([])
   const [nextLessonId, setNextLessonId] = useState<number | null>(null)
   const [code, setCode] = useState('')
   const [savedCode, setSavedCode] = useState('')
@@ -195,7 +197,7 @@ function ClassroomContent() {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
         if (authError || !user) { window.location.assign('/login'); return }
         const { data, error } = await supabase.from('sessions')
-          .select('id,module_id,session_number,title,order_index,duration_minutes,analogy_physical,content_markdown,starter_code,hints,quick_check,modules!inner(id,title,month_number,course_id,status)')
+          .select('id,module_id,session_number,title,order_index,duration_minutes,analogy_physical,content_markdown,starter_code,hints,quick_check,modules!inner(id,title,month_number,order_index,course_id,status)')
           .eq('id', sessionId).maybeSingle()
         if (error) throw error
         if (!data) throw new Error('This lesson is not available to your account. Check your course access or return to the dashboard.')
@@ -209,9 +211,31 @@ function ClassroomContent() {
         const { data: courseSessions, error: sessionsError } = await supabase.from('sessions')
           .select('id,session_number').eq('module_id', loaded.module_id).order('session_number')
         if (sessionsError) throw sessionsError
+        const { data: modules, error: modulesError } = await supabase.from('modules')
+          .select('id,month_number,order_index').eq('course_id', loaded.modules.course_id).eq('status', 'published').order('order_index')
+        if (modulesError) throw modulesError
+        const moduleRows = modules ?? []
+        const moduleIds = moduleRows.map((module) => module.id)
+        const { data: allSessions, error: allSessionsError } = moduleIds.length
+          ? await supabase.from('sessions').select('id,module_id,session_number,title').in('module_id', moduleIds)
+          : { data: [], error: null }
+        if (allSessionsError) throw allSessionsError
+        const sessionIds = (allSessions ?? []).map((session) => session.id)
+        const { data: savedDrafts, error: draftsError } = sessionIds.length
+          ? await supabase.from('user_progress').select('session_id,draft_code').eq('student_id', user.id).in('session_id', sessionIds).not('draft_code', 'is', null)
+          : { data: [], error: null }
+        if (draftsError) throw draftsError
+        const modulesById = new Map(moduleRows.map((module) => [module.id, module]))
+        const savedSessionIds = new Set((savedDrafts ?? []).map((draft) => draft.session_id))
+        const files = (allSessions ?? []).filter((session) => session.id === sessionId || savedSessionIds.has(session.id)).map((session) => {
+          const module = modulesById.get(session.module_id)
+          const weekNumber = ((module?.order_index ?? 1) - 1) % 4 + 1
+          return { sessionId: session.id, title: session.title, monthNumber: module?.month_number ?? 1, weekNumber, sessionNumber: session.session_number }
+        }).sort((a, b) => a.monthNumber - b.monthNumber || a.weekNumber - b.weekNumber || a.sessionNumber - b.sessionNumber)
         const currentIndex = (courseSessions ?? []).findIndex((item) => item.id === sessionId)
         if (!active) return
         setLesson(loaded)
+        setPracticeFiles(files)
         const draft = progressRow?.draft_code ?? loaded.starter_code ?? ''
         initialEditorCodeRef.current = draft
         setCode(draft); setSavedCode(draft); setSaveState('saved')
@@ -292,7 +316,7 @@ function ClassroomContent() {
 
   return <div className="flex min-h-screen flex-col bg-[#090d16] text-slate-100">
     <header className="sticky top-0 z-20 flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-900/90 px-4 py-2 backdrop-blur-xl md:px-6">
-      <div className="flex min-w-0 items-center gap-3"><Link href="/dashboard" className="flex shrink-0 items-center gap-1 text-xs text-slate-300 hover:text-white"><ArrowLeft className="h-4 w-4"/> Dashboard</Link><div className="hidden h-5 border-l border-white/20 sm:block"/><div className="min-w-0"><div className="truncate text-sm font-bold text-white">{lesson.title}</div><div className="text-[11px] text-slate-400">Month {lesson.modules.month_number} · Session {lesson.session_number} · {lesson.duration_minutes} minutes</div></div></div>
+      <div className="flex min-w-0 items-center gap-3"><Link href="/dashboard" className="flex shrink-0 items-center gap-1 text-xs text-slate-300 hover:text-white"><ArrowLeft className="h-4 w-4"/> Dashboard</Link><div className="hidden h-5 border-l border-white/20 sm:block"/><div className="min-w-0"><div className="truncate text-sm font-bold text-white">{lesson.title}</div><div className="text-[11px] text-slate-400">Month {lesson.modules.month_number} · Week {((lesson.modules.order_index - 1) % 4) + 1} · Session {lesson.session_number} · {lesson.duration_minutes} minutes</div></div></div>
       <div className="flex items-center gap-2"><span className="hidden text-xs text-slate-400 sm:inline">{saveState === 'saving' ? 'Saving draft…' : saveState === 'error' ? 'Draft not saved' : 'Draft saved'}</span><ThemeToggle/><AccountMenu dark/><button onClick={handleResetCode} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200"><RotateCcw className="mr-1 inline h-3.5 w-3.5"/>Reset</button><button onClick={handleRunCode} disabled={!isReady || isExecuting} className="rounded-lg bg-emerald-400 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50"><Play className="mr-1 inline h-3.5 w-3.5"/>{isPyodideLoading ? 'Loading Python…' : isExecuting ? 'Running…' : 'Run code'}</button></div>
     </header>
 
@@ -306,6 +330,22 @@ function ClassroomContent() {
 
       <section ref={editorPanelRef} className={`flex min-h-[55vh] flex-col overflow-hidden border border-white/10 bg-slate-950 ${isEditorFullscreen ? 'h-dvh w-screen rounded-none p-3' : 'rounded-2xl'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-slate-900 px-4 py-3 text-xs text-slate-300"><div className="flex items-center gap-3"><span>Python practice editor</span><span className="text-emerald-300">Browser practice · no grade saved</span></div><div className="flex items-center gap-2">{isEditorFullscreen && <button type="button" onClick={() => void handleRunCode()} disabled={!isReady || isExecuting} className="rounded-md bg-emerald-400 px-2.5 py-1.5 font-bold text-slate-950 disabled:opacity-50"><Play className="mr-1 inline h-3.5 w-3.5"/>{isExecuting ? 'Running…' : 'Run code'}</button>}<button type="button" onClick={() => setWrapEditorLines((value) => !value)} aria-pressed={wrapEditorLines} className="rounded-md border border-white/15 px-2.5 py-1.5 text-slate-200 hover:bg-white/10">{wrapEditorLines ? 'Turn line wrap off' : 'Wrap long lines'}</button><button type="button" onClick={() => void toggleEditorFullscreen()} aria-label={isEditorFullscreen ? 'Exit full screen editor' : 'Open full screen editor'} className="rounded-md border border-white/15 px-2.5 py-1.5 text-slate-200 hover:bg-white/10"><span className="flex items-center gap-1.5">{isEditorFullscreen ? <Minimize2 className="h-3.5 w-3.5"/> : <Maximize2 className="h-3.5 w-3.5"/>}{isEditorFullscreen ? 'Exit full screen' : 'Full screen'}</span></button></div></div>
+        <nav aria-label="Saved practice files" className="border-b border-white/10 bg-slate-900/70 px-3 py-2">
+          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-300"><FileCode2 className="h-3.5 w-3.5 text-emerald-300"/> Your saved practice files <span className="font-normal text-slate-400">· saved automatically for each lesson</span></p>
+          {practiceFiles.length ? <div className="flex gap-2 overflow-x-auto pb-1">{practiceFiles.map((file) => {
+            const safeTitle = file.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 32) || 'practice'
+            const filename = `month_${file.monthNumber}_week_${file.weekNumber}_session_${file.sessionNumber}_${safeTitle}.py`
+            return <Link key={file.sessionId} href={`/classroom/${file.sessionId}`} title={`${file.title} · opens this lesson and restores its saved code`} aria-current={file.sessionId === lesson.id ? 'page' : undefined} onClick={async (event) => {
+              if (file.sessionId === lesson.id) return
+              event.preventDefault()
+              const { data: { user } } = await supabase.auth.getUser()
+              if (!user) { setSaveState('error'); return }
+              const { error } = await supabase.from('user_progress').upsert({ student_id: user.id, session_id: lesson.id, draft_code: code, timer_seconds_spent: secondsSpent, last_accessed: new Date().toISOString() }, { onConflict: 'student_id,session_id' })
+              if (error) { setSaveState('error'); return }
+              window.location.assign(`/classroom/${file.sessionId}`)
+            }} className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-[11px] ${file.sessionId === lesson.id ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-slate-950 text-slate-300 hover:border-white/30 hover:text-white'}`}><FileCode2 className="h-3.5 w-3.5"/>{filename}</Link>
+          })}</div> : <p className="text-[11px] text-slate-400">Your saved files will appear here as you practice.</p>}
+        </nav>
         <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1"><Editor height="100%" width="100%" defaultLanguage="python" defaultValue={initialEditorCodeRef.current} theme="vs-dark" onChange={handleEditorChange} onMount={handleEditorMount} options={editorOptions}/></div>
       </section>
 
