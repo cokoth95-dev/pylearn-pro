@@ -6,7 +6,7 @@ on:
       - 'web/supabase/**'
       - '.github/workflows/validate-supabase-migrations.yml'
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
     paths:
       - 'web/supabase/**'
       - '.github/workflows/validate-supabase-migrations.yml'
