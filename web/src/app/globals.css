@@ -42,83 +42,90 @@
   border: 1px solid var(--line);
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-[#faf7f0]"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-white"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-stone-50"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-stone-50/70"] {
+:root[data-theme="dark"] [class~="bg-[#faf7f0]"],
+:root[data-theme="dark"] [class~="bg-[#fffefa]"],
+:root[data-theme="dark"] [class~="bg-white"],
+:root[data-theme="dark"] [class~="bg-white/95"],
+:root[data-theme="dark"] [class~="bg-stone-50"],
+:root[data-theme="dark"] [class~="bg-stone-50/70"] {
   background-color: #161b22 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-amber-50"] {
+:root[data-theme="dark"] [class~="bg-amber-50"],
+:root[data-theme="dark"] [class~="bg-amber-100"] {
   background-color: #3d2e13 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-50"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-50/60"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-100"] {
+:root[data-theme="dark"] [class~="bg-emerald-50"],
+:root[data-theme="dark"] [class~="bg-emerald-50/60"],
+:root[data-theme="dark"] [class~="bg-emerald-100"] {
   background-color: #12352d !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-rose-50"] {
+:root[data-theme="dark"] [class~="bg-rose-50"] {
   background-color: #3b2026 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-stone-100"] {
+:root[data-theme="dark"] [class~="bg-stone-100"] {
   background-color: #242b33 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-900"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-800"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-700"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-600"] {
+:root[data-theme="dark"] [class~="text-stone-900"],
+:root[data-theme="dark"] [class~="text-stone-800"],
+:root[data-theme="dark"] [class~="text-stone-700"],
+:root[data-theme="dark"] [class~="text-stone-600"] {
   color: #e6edf3 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-500"] {
-  color: #9da7b3 !important;
+:root[data-theme="dark"] [class~="text-stone-500"] {
+  color: #b0bac5 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-950"] {
+:root[data-theme="dark"] [class~="text-stone-400"] {
+  color: #c3cbd3 !important;
+}
+
+:root[data-theme="dark"] [class~="text-amber-950"],
+:root[data-theme="dark"] [class~="text-amber-900"],
+:root[data-theme="dark"] [class~="text-amber-800"],
+:root[data-theme="dark"] [class~="text-amber-700"],
+:root[data-theme="dark"] [class~="text-amber-300"] {
   color: #f5d68a !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-700"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-800"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-900"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-950"] {
+:root[data-theme="dark"] [class~="text-emerald-700"],
+:root[data-theme="dark"] [class~="text-emerald-800"],
+:root[data-theme="dark"] [class~="text-emerald-900"],
+:root[data-theme="dark"] [class~="text-emerald-950"] {
   color: #86efc2 !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-700"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-900"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-300"] {
-  color: #fcd982 !important;
-}
-
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-rose-800"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-rose-900"] {
+:root[data-theme="dark"] [class~="text-rose-600"],
+:root[data-theme="dark"] [class~="text-rose-700"],
+:root[data-theme="dark"] [class~="text-rose-800"],
+:root[data-theme="dark"] [class~="text-rose-900"] {
   color: #fda4af !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-100"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-200"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-300"] {
+:root[data-theme="dark"] [class~="border-stone-100"],
+:root[data-theme="dark"] [class~="border-stone-200"],
+:root[data-theme="dark"] [class~="border-stone-300"] {
   border-color: rgba(255, 255, 255, 0.12) !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-emerald-200"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-emerald-600"] {
+:root[data-theme="dark"] [class~="border-emerald-200"],
+:root[data-theme="dark"] [class~="border-emerald-600"] {
   border-color: rgba(52, 211, 153, 0.38) !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-rose-200"],
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-rose-300"] {
+:root[data-theme="dark"] [class~="border-rose-200"],
+:root[data-theme="dark"] [class~="border-rose-300"] {
   border-color: rgba(251, 113, 133, 0.4) !important;
 }
 
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) input,
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) textarea,
-:root[data-theme="dark"] :is(.admin-console, .instructor-console) select {
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] select {
   color-scheme: dark;
 }
 
@@ -149,6 +156,15 @@
 :root[data-theme="light"] [class~="text-slate-300"],
 :root[data-theme="light"] [class~="text-slate-400"] {
   color: #263238 !important;
+}
+
+/* Keep white labels on saturated action buttons; the general light-mode rule
+   above is intended for text that used to sit on dark gray surfaces. */
+:root[data-theme="light"] [class~="text-white"][class~="bg-emerald-700"],
+:root[data-theme="light"] [class~="text-white"][class~="bg-emerald-800"],
+:root[data-theme="light"] [class~="text-white"][class~="bg-rose-700"],
+:root[data-theme="light"] [class~="text-white"][class~="bg-rose-800"] {
+  color: #ffffff !important;
 }
 
 :root[data-theme="light"] [class~="text-slate-500"],

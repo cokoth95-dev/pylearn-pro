@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { BookOpen, ClipboardCheck, LoaderCircle, LockKeyhole, Plus, ShieldCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
@@ -23,6 +24,7 @@ const button = 'inline-flex items-center justify-center gap-2 rounded-xl bg-emer
 const blankLesson = (number: number): LessonForm => ({ session_number: number, title: '', analogy: '', content: '', starter: '# Write your Python code here\n', hints: '', xp: 50, duration: 15, question: '', options: ['', '', ''], correct: 0, explanation: '' })
 
 export default function InstructorPage() {
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [access, setAccess] = useState<'loading' | 'allowed' | 'denied'>('loading')
   const [tab, setTab] = useState<'submissions' | 'progress' | 'content'>('submissions')
@@ -49,7 +51,7 @@ export default function InstructorPage() {
   const load = useCallback(async () => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     setError('')
-    if (authError || !user) { window.location.assign('/login'); return }
+    if (authError || !user) { router.push('/login'); return }
     const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
     if (profileError) throw profileError
     if (profile?.role !== 'instructor') { setAccess('denied'); return }
@@ -86,7 +88,7 @@ export default function InstructorPage() {
     if (peopleResult.error) throw peopleResult.error
     setProfiles((peopleResult.data ?? []) as Profile[])
     setAccess('allowed')
-  }, [supabase])
+  }, [router, supabase])
 
   useEffect(() => {
     let active = true

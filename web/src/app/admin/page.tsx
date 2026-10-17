@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/theme/ThemeToggle'
 import AccountMenu from '@/components/account/AccountMenu'
@@ -40,6 +42,7 @@ function formatErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function AdminPage() {
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [access, setAccess] = useState<'loading' | 'allowed' | 'denied'>('loading')
   const [view, setView] = useState<View>('overview')
@@ -76,7 +79,7 @@ export default function AdminPage() {
   const loadData = useCallback(async () => {
     setErrorMessage('')
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) { window.location.assign('/login'); return }
+    if (authError || !user) { router.push('/login'); return }
     const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
     if (profileError) throw profileError
     if (profile?.role !== 'admin') { setAccess('denied'); return }
@@ -125,7 +128,7 @@ export default function AdminPage() {
     if (admissionDraftResult.data) setAdmissionDraft(admissionDraftResult.data as { title: string; content_markdown: string })
     setSelectedCourse((current) => current || courseResult.data?.[0]?.id || '')
     setAccess('allowed')
-  }, [supabase])
+  }, [router, supabase])
 
   const refreshPaymentQueue = useCallback(async () => {
     const { data, error } = await supabase.from('payment_requests').select('id,student_id,course_id,purchase_type,target_month,amount_kes,receipt_suffix,payer_phone,status,decline_reason,created_at').order('created_at', { ascending: false })
@@ -489,7 +492,7 @@ export default function AdminPage() {
             <label className="block max-w-sm text-sm font-semibold">Media type<select className={`${inputClass} mt-1`} value={heroSettings.hero_media_type} disabled={busy} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_media_type: event.target.value as 'image' | 'video' }))}><option value="image">Image or animated GIF</option><option value="video">Video (muted and looping)</option></select></label>
             <label className="block text-sm font-semibold">Upload {heroSettings.hero_media_type === 'video' ? 'a video' : 'an image or GIF'}<input type="file" accept={heroSettings.hero_media_type === 'video' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp,image/avif,image/gif'} disabled={busy} onChange={(event) => { void uploadHeroImage(event.target.files?.[0]); event.currentTarget.value = '' }} className="mt-2 block w-full rounded-xl border border-stone-300 p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-3 file:py-2 file:font-semibold file:text-white"/><span className="mt-1 block text-xs font-normal text-stone-500">JPG, PNG, WebP, AVIF, or GIF; MP4 or WebM video. Upload limit: 20 MB.</span></label>
             <div className="space-y-2"><label className="block text-sm font-semibold">Or paste a direct media URL<input type="url" inputMode="url" placeholder={heroSettings.hero_media_type === 'video' ? 'https://example.com/hero.mp4' : 'https://example.com/hero.gif'} value={heroUrlDraft} onChange={(event) => setHeroUrlDraft(event.target.value)} className={`${inputClass} mt-1`}/></label><p className="text-xs leading-5 text-stone-500">Use a direct HTTPS link to the image/GIF or an MP4/WebM file. A Pinterest pin page link does not point to the media file; open the pin and copy the image address itself. The source host must allow your website to display it.</p><button type="button" disabled={busy || !heroUrlDraft.trim()} onClick={() => void saveHeroMediaUrl()} className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm font-semibold text-stone-800 hover:bg-stone-50 disabled:opacity-50">Use this media link</button></div>
-            {heroSettings.hero_image_url ? <div className="relative isolate min-h-56 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white"><div aria-hidden="true" className="absolute inset-0 -z-10 overflow-hidden" style={{ opacity: heroSettings.hero_image_opacity / 100 }}>{heroSettings.hero_media_type === 'video' ? <video src={heroSettings.hero_image_url} autoPlay muted loop playsInline className="h-full w-full object-cover"/> : <img src={heroSettings.hero_image_url} alt="" className="h-full w-full object-cover"/>}</div><div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/65"/><p className="text-xs font-bold uppercase tracking-wider text-amber-300">Live preview · {heroSettings.hero_media_type === 'video' ? 'video' : 'image/GIF'}</p><h3 className="mt-3 text-2xl font-black">Your Modern Python Online School</h3><p className="mt-2 max-w-lg text-sm text-slate-100">A preview of the public hero text over your selected background.</p></div> : <div className="grid min-h-40 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-sm text-stone-500">No hero media selected. The landing page uses its original background.</div>}
+            {heroSettings.hero_image_url ? <div className="relative isolate min-h-56 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white"><div aria-hidden="true" className="absolute inset-0 -z-10 overflow-hidden" style={{ opacity: heroSettings.hero_image_opacity / 100 }}>{heroSettings.hero_media_type === 'video' ? <video src={heroSettings.hero_image_url} autoPlay muted loop playsInline className="h-full w-full object-cover"/> : <Image src={heroSettings.hero_image_url} alt="" fill sizes="100vw" unoptimized className="object-cover"/>}</div><div aria-hidden="true" className="absolute inset-0 -z-10 bg-slate-950/65"/><p className="text-xs font-bold uppercase tracking-wider text-amber-300">Live preview · {heroSettings.hero_media_type === 'video' ? 'video' : 'image/GIF'}</p><h3 className="mt-3 text-2xl font-black">Your Modern Python Online School</h3><p className="mt-2 max-w-lg text-sm text-slate-100">A preview of the public hero text over your selected background.</p></div> : <div className="grid min-h-40 place-items-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 text-sm text-stone-500">No hero media selected. The landing page uses its original background.</div>}
             <label className="block text-sm font-semibold">Media visibility: {heroSettings.hero_image_opacity}%<input type="range" min="0" max="100" step="5" value={heroSettings.hero_image_opacity} onChange={(event) => setHeroSettings((current) => ({ ...current, hero_image_opacity: Number(event.target.value) }))} className="mt-3 block w-full accent-emerald-700"/><span className="mt-1 block text-xs font-normal text-stone-500">Lower visibility makes the media fainter. Text contrast protection remains in place.</span></label>
             <div className="flex flex-wrap gap-3"><button disabled={busy} onClick={() => void saveHeroOpacity()} className={buttonClass}>Save media visibility</button>{heroSettings.hero_image_url && <button disabled={busy} onClick={() => void removeHeroImage()} className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50">Remove media</button>}</div>
           </section>
