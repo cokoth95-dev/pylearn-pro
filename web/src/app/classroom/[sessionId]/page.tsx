@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Editor from '@monaco-editor/react'
 import { usePyodide } from '@/lib/usePyodide'
 import MemoryVisualizer from '@/components/classroom/MemoryVisualizer'
@@ -98,14 +98,20 @@ function LessonText({ source }: { source: string }) {
 function ClassroomContent() {
   const params = useParams<{ sessionId: string }>()
   const sessionId = Number(params.sessionId)
+  return <ClassroomLesson key={sessionId} sessionId={sessionId}/>
+}
+
+function ClassroomLesson({ sessionId }: { sessionId: number }) {
+  const router = useRouter()
   const { isReady, isLoading: isPyodideLoading, runPython } = usePyodide()
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [practiceFiles, setPracticeFiles] = useState<PracticeFile[]>([])
   const [nextLessonId, setNextLessonId] = useState<number | null>(null)
   const [code, setCode] = useState('')
   const [savedCode, setSavedCode] = useState('')
-  const [loadError, setLoadError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const isValidSessionId = Number.isSafeInteger(sessionId) && sessionId >= 1
+  const [loadError, setLoadError] = useState(isValidSessionId ? '' : 'This lesson link is not valid.')
+  const [loading, setLoading] = useState(isValidSessionId)
   const [terminalOutput, setTerminalOutput] = useState('Run your Python code here. Browser practice does not submit a grade.')
   const [terminalError, setTerminalError] = useState('')
   const [fullTraceback, setFullTraceback] = useState('')
@@ -127,7 +133,6 @@ function ClassroomContent() {
   const editorHostRef = useRef<HTMLDivElement | null>(null)
   const editorPanelRef = useRef<HTMLElementTagNameMap['section'] | null>(null)
   const editorRef = useRef<{ layout: () => void; setValue: (value: string) => void } | null>(null)
-  const initialEditorCodeRef = useRef('')
 
   const handleEditorMount = useCallback((editor: { layout: () => void; setValue: (value: string) => void }) => {
     editorRef.current = editor
@@ -191,13 +196,12 @@ function ClassroomContent() {
   }, [])
 
   useEffect(() => {
-    if (!Number.isSafeInteger(sessionId) || sessionId < 1) { setLoadError('This lesson link is not valid.'); setLoading(false); return }
-    setLoading(true); setLoadError('')
+    if (!isValidSessionId) return
     let active = true
     async function loadLesson() {
       try {
         const { data: { user }, error: authError } = await supabase.auth.getUser()
-        if (authError || !user) { window.location.assign('/login'); return }
+        if (authError || !user) { router.replace('/login'); return }
         const { data, error } = await supabase.from('sessions')
           .select('id,module_id,session_number,title,order_index,duration_minutes,analogy_physical,content_markdown,starter_code,hints,quick_check,modules!inner(id,title,month_number,order_index,course_id,status)')
           .eq('id', sessionId).maybeSingle()
@@ -230,16 +234,15 @@ function ClassroomContent() {
         const modulesById = new Map(moduleRows.map((module) => [module.id, module]))
         const savedSessionIds = new Set((savedDrafts ?? []).map((draft) => draft.session_id))
         const files = (allSessions ?? []).filter((session) => session.id === sessionId || savedSessionIds.has(session.id)).map((session) => {
-          const module = modulesById.get(session.module_id)
-          const weekNumber = ((module?.order_index ?? 1) - 1) % 4 + 1
-          return { sessionId: session.id, title: session.title, monthNumber: module?.month_number ?? 1, weekNumber, sessionNumber: session.session_number }
+          const lessonModule = modulesById.get(session.module_id)
+          const weekNumber = ((lessonModule?.order_index ?? 1) - 1) % 4 + 1
+          return { sessionId: session.id, title: session.title, monthNumber: lessonModule?.month_number ?? 1, weekNumber, sessionNumber: session.session_number }
         }).sort((a, b) => a.monthNumber - b.monthNumber || a.weekNumber - b.weekNumber || a.sessionNumber - b.sessionNumber)
         const currentIndex = (courseSessions ?? []).findIndex((item) => item.id === sessionId)
         if (!active) return
         setLesson(loaded)
         setPracticeFiles(files)
         const draft = progressRow?.draft_code ?? loaded.starter_code ?? ''
-        initialEditorCodeRef.current = draft
         setCode(draft); setSavedCode(draft); setSaveState('saved')
         setSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
         setSavedSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
@@ -258,7 +261,7 @@ function ClassroomContent() {
     }
     void loadLesson()
     return () => { active = false }
-  }, [sessionId, supabase])
+  }, [isValidSessionId, router, sessionId, supabase])
 
   useEffect(() => {
     const timer = window.setInterval(() => setSecondsSpent((seconds) => seconds + 60), 60000)
@@ -266,9 +269,9 @@ function ClassroomContent() {
   }, [])
 
   useEffect(() => {
-    if (!lesson || saveState === 'loading' || (code === savedCode && secondsSpent === savedSecondsSpent)) return
-    setSaveState('saving')
+    if (!lesson || loading || (code === savedCode && secondsSpent === savedSecondsSpent)) return
     const timer = window.setTimeout(async () => {
+      setSaveState('saving')
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setSaveState('error'); return }
       const { error } = await supabase.from('user_progress').upsert({
@@ -279,7 +282,7 @@ function ClassroomContent() {
       else { setSavedCode(code); setSavedSecondsSpent(secondsSpent); setSaveState('saved') }
     }, code === savedCode ? 0 : 900)
     return () => window.clearTimeout(timer)
-  }, [code, lesson, savedCode, savedSecondsSpent, saveState, secondsSpent, supabase])
+  }, [code, lesson, loading, savedCode, savedSecondsSpent, secondsSpent, supabase])
 
   const handleRunCode = useCallback(async () => {
     if (document.fullscreenElement === editorPanelRef.current) await document.exitFullscreen().catch(() => undefined)
@@ -361,11 +364,11 @@ function ClassroomContent() {
               if (!user) { setSaveState('error'); return }
               const { error } = await supabase.from('user_progress').upsert({ student_id: user.id, session_id: lesson.id, draft_code: code, timer_seconds_spent: secondsSpent, last_accessed: new Date().toISOString() }, { onConflict: 'student_id,session_id' })
               if (error) { setSaveState('error'); return }
-              window.location.assign(`/classroom/${file.sessionId}`)
+              router.push(`/classroom/${file.sessionId}`)
             }} className={`flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 font-mono text-[11px] ${file.sessionId === lesson.id ? 'border-emerald-400/60 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-slate-950 text-slate-300 hover:border-white/30 hover:text-white'}`}><FileCode2 className="h-3.5 w-3.5"/>{filename}</Link>
           })}</div> : <p className="text-[11px] text-slate-400">Your saved files will appear here as you practice.</p>}
         </nav>
-        <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1"><Editor height="100%" width="100%" defaultLanguage="python" defaultValue={initialEditorCodeRef.current} theme="vs-dark" onChange={handleEditorChange} onMount={handleEditorMount} options={editorOptions}/></div>
+        <div ref={editorHostRef} className="min-h-[340px] min-w-0 flex-1">{lesson && !loading && <Editor height="100%" width="100%" defaultLanguage="python" defaultValue={code} theme="vs-dark" onChange={handleEditorChange} onMount={handleEditorMount} options={editorOptions}/>}</div>
       </section>
 
       <section className="flex min-h-[55vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
