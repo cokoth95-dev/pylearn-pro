@@ -54,7 +54,7 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
         options: {
@@ -80,8 +80,8 @@ export default function RegisterPage() {
         setSuccessMsg('Your account is created. Check your email and verify it before signing in. You will review the Admission Document on your first login.')
       }
       setIsLoading(false)
-    } catch (err: any) {
-      setErrorMsg(err.message || 'An unexpected error occurred.')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'An unexpected error occurred.')
       setIsLoading(false)
     }
   }

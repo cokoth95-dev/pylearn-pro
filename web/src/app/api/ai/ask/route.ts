@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const LAYMAN_SYSTEM_PROMPT = `You are a careful Python tutor for a learner who may be completely new to programming.
 
@@ -17,6 +18,30 @@ export const maxDuration = 50
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 type Provider = { name: string; generate: (messages: ChatMessage[], signal: AbortSignal) => Promise<string> }
+
+async function saveTutorReply({ conversationId, questionMessageId, userId, questionText, content, provider, fallback }: {
+  conversationId: string
+  questionMessageId: string
+  userId: string
+  questionText: string
+  content: string
+  provider: string
+  fallback: boolean
+}) {
+  const admin = createAdminClient()
+  const { data: conversation, error: conversationError } = await admin.from('ai_conversations')
+    .select('id,student_id').eq('id', conversationId).eq('student_id', userId).maybeSingle()
+  if (conversationError || !conversation) throw new Error('The saved chat could not be verified.')
+  const { data: question, error: questionError } = await admin.from('ai_chat_messages')
+    .select('id,content').eq('id', questionMessageId).eq('conversation_id', conversationId).eq('role', 'user').maybeSingle()
+  if (questionError || !question || question.content !== questionText) throw new Error('The saved learner question could not be verified.')
+  const { data: saved, error: saveError } = await admin.from('ai_chat_messages').insert({
+    conversation_id: conversationId, role: 'assistant', content, provider, fallback,
+  }).select('id').single()
+  if (saveError || !saved) throw new Error('The mentor reply could not be saved to chat history.')
+  await admin.from('ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversation.id)
+  return saved.id as string
+}
 
 class ProviderError extends Error {
   constructor(readonly provider: string, readonly status?: number, readonly timedOut = false) {
@@ -137,7 +162,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Complete guardian confirmation and accept the Admission Document before using lesson features.' }, { status: 403 })
     }
 
-    let body: { question?: unknown; code?: unknown; sessionTitle?: unknown; lessonContent?: unknown; history?: unknown }
+    let body: { question?: unknown; code?: unknown; sessionTitle?: unknown; lessonContent?: unknown; history?: unknown; conversationId?: unknown; questionMessageId?: unknown }
     try {
       body = JSON.parse(rawBody) as typeof body
     } catch {
@@ -148,9 +173,13 @@ export async function POST(req: NextRequest) {
       typeof body.code !== 'string' || body.code.length > 20000 ||
       (body.sessionTitle !== undefined && (typeof body.sessionTitle !== 'string' || body.sessionTitle.length > 200)) ||
       (body.lessonContent !== undefined && (typeof body.lessonContent !== 'string' || body.lessonContent.length > 16000)) ||
+      ((body.conversationId !== undefined || body.questionMessageId !== undefined) &&
+        (typeof body.conversationId !== 'string' || typeof body.questionMessageId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.conversationId) ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.questionMessageId))) ||
       (body.history !== undefined && (!Array.isArray(body.history) || body.history.length > 10 || body.history.some((item) =>
         !item || typeof item !== 'object' || !('role' in item) || !('content' in item) ||
-        !['user', 'ai'].includes(String(item.role)) || typeof item.content !== 'string' || item.content.length > 3000
+        !['user', 'ai', 'assistant'].includes(String(item.role)) || typeof item.content !== 'string' || item.content.length > 3000
       )))
     ) {
       return NextResponse.json({ error: 'Question or code has an invalid format.' }, { status: 400 })
@@ -159,7 +188,7 @@ export async function POST(req: NextRequest) {
     const code = body.code as string
     const sessionTitle = body.sessionTitle as string | undefined
     const lessonContent = body.lessonContent as string | undefined
-    const history = (body.history ?? []) as Array<{ role: 'user' | 'ai'; content: string }>
+    const history = (body.history ?? []) as Array<{ role: 'user' | 'ai' | 'assistant'; content: string }>
 
     const prompt = `
 LESSON TITLE:
@@ -192,7 +221,16 @@ LATEST QUESTION (answer this one):
       const provider = providers[index]
       try {
         const reply = await provider.generate(messages, AbortSignal.timeout(9000))
-        return NextResponse.json({ reply, provider: provider.name, fallback: index > 0 })
+        let savedMessageId: string | undefined
+        if (typeof body.conversationId === 'string' && typeof body.questionMessageId === 'string') {
+          try {
+            savedMessageId = await saveTutorReply({ conversationId: body.conversationId, questionMessageId: body.questionMessageId, userId: user.id, questionText: question, content: reply, provider: provider.name, fallback: index > 0 })
+          } catch (saveError) {
+            console.error('AI tutor reply could not be saved', saveError instanceof Error ? saveError.message : 'unknown error')
+            return NextResponse.json({ error: 'The answer was prepared, but your saved chat could not be updated. Please try again.' }, { status: 503 })
+          }
+        }
+        return NextResponse.json({ reply, provider: provider.name, fallback: index > 0, savedMessageId })
       } catch (error) {
         console.warn('AI provider failed; trying the next configured free provider', {
           provider: provider.name,

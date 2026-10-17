@@ -1,25 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { Moon, Sun } from 'lucide-react'
 
 type Theme = 'light' | 'dark'
 
+const THEME_KEY = 'pylearnpro-theme'
+const THEME_EVENT = 'pylearnpro-theme-change'
+const getThemeSnapshot = (): Theme => window.localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'
+const getServerThemeSnapshot = (): Theme => 'light'
+const subscribeToTheme = (callback: () => void) => {
+  window.addEventListener('storage', callback)
+  window.addEventListener(THEME_EVENT, callback)
+  return () => {
+    window.removeEventListener('storage', callback)
+    window.removeEventListener(THEME_EVENT, callback)
+  }
+}
+
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>('light')
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getServerThemeSnapshot)
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem('pylearnpro-theme')
-    const initialTheme: Theme = savedTheme === 'dark' ? 'dark' : 'light'
-    document.documentElement.dataset.theme = initialTheme
-    setTheme(initialTheme)
-  }, [])
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   function toggleTheme() {
     const nextTheme: Theme = theme === 'light' ? 'dark' : 'light'
     document.documentElement.dataset.theme = nextTheme
-    window.localStorage.setItem('pylearnpro-theme', nextTheme)
-    setTheme(nextTheme)
+    window.localStorage.setItem(THEME_KEY, nextTheme)
+    window.dispatchEvent(new Event(THEME_EVENT))
   }
 
   return (

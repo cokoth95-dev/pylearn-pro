@@ -14,7 +14,7 @@ export default function GuardianConsent({ token }: { token: string }) {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!token) { setError('This guardian link is invalid.'); setLoading(false); return }
+    if (!token) return
     void fetch(`/api/guardian/details?token=${encodeURIComponent(token)}`).then(async (response) => {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error ?? 'The admission guide could not be loaded.')
@@ -36,7 +36,7 @@ export default function GuardianConsent({ token }: { token: string }) {
 
   return <main className="min-h-screen bg-[#faf7f0] px-4 py-10 text-stone-900"><section className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-9">
     <Link href="/" className="text-sm font-bold text-emerald-800">PyLearn Pro</Link><p className="mt-5 text-xs font-bold uppercase tracking-wider text-emerald-800">Parent or guardian review</p>
-    {loading ? <p className="mt-5 text-sm text-stone-600">Loading the guide…</p> : error && !details ? <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{error}</p> : details && <>
+    {!token ? <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">This guardian link is invalid.</p> : loading ? <p className="mt-5 text-sm text-stone-600">Loading the guide…</p> : error && !details ? <p role="alert" className="mt-5 rounded-xl bg-rose-50 p-4 text-sm text-rose-900">{error}</p> : details && <>
       <h1 className="mt-1 text-2xl font-extrabold">Please review the admission guide</h1><p className="mt-2 text-sm leading-6 text-stone-600">This request is for {details.learnerName}. The one-time link was sent to {details.guardianEmail} and is tied to guide version {details.document.version}.</p>
       <article className="mt-6 max-h-[55vh] overflow-y-auto rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm leading-6">{details.document.content_markdown.split('\n').map((line, index) => <p key={index} className={line.startsWith('## ') ? 'mt-4 font-bold first:mt-0' : line.startsWith('- ') ? 'ml-4 list-item list-disc' : line ? 'mt-2' : 'h-2'}>{line.startsWith('## ') ? line.slice(3) : line.startsWith('- ') ? line.slice(2) : line}</p>)}</article>
       <label className="mt-5 flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-950"><input type="checkbox" className="mt-1 h-4 w-4 accent-emerald-700" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)}/><span>I am the parent or legal guardian of {details.learnerName}. I have reviewed this guide and confirm permission for the learner to use PyLearn Pro.</span></label>

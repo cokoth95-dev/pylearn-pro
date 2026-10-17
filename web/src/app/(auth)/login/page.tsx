@@ -1,31 +1,22 @@
 ﻿"use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Mail, Lock, ArrowRight, Eye, EyeOff, AlertCircle } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [notice, setNotice] = useState('')
+  const [errorMsg, setErrorMsg] = useState(searchParams.get('error') === 'confirmation' ? 'That verification link could not be completed. Request a new one or try signing in.' : '')
+  const notice = searchParams.get('checkEmail') === '1' ? 'Check your inbox and verify your email before signing in.' : ''
   const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('checkEmail') === '1') {
-      setNotice('Check your inbox and verify your email before signing in.')
-    }
-    if (params.get('error') === 'confirmation') {
-      setErrorMsg('That verification link could not be completed. Request a new one or try signing in.')
-    }
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,8 +47,8 @@ export default function LoginPage() {
         ? requestedPath
         : '/dashboard'
       router.replace(nextPath)
-    } catch (err: any) {
-      setErrorMsg(err.message || 'An unexpected error occurred.')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'An unexpected error occurred.')
       setIsLoading(false)
     }
   }
@@ -151,7 +142,7 @@ export default function LoginPage() {
 
           {/* Switch to Register */}
           <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-slate-400">
-            Don't have an account yet?{' '}
+          Don&apos;t have an account yet?{' '}
             <Link href="/register" className="text-cyan-400 font-semibold hover:underline">
               Start Free Month 1
             </Link>
@@ -160,4 +151,8 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+export default function LoginPage() {
+  return <Suspense fallback={<main className="min-h-screen bg-[#090d16]" aria-label="Loading sign in" />}><LoginForm /></Suspense>
 }

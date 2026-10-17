@@ -4,9 +4,18 @@ import { useEffect, useRef, useState } from 'react'
 
 declare global {
   interface Window {
-    loadPyodide: any
-    pyodide: any
+    loadPyodide?: (options: { indexURL: string }) => Promise<PyodideInstance>
+    pyodide?: PyodideInstance
   }
+}
+
+interface PyodideInstance {
+  globals: {
+    set: (name: string, value: unknown) => void
+    get: (name: string) => unknown
+    delete: (name: string) => void
+  }
+  runPythonAsync: (code: string) => Promise<unknown>
 }
 
 interface PyodideResult {
@@ -18,7 +27,7 @@ interface PyodideResult {
 export function usePyodide() {
   const [isReady, setIsReady] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const pyodideRef = useRef<any>(null)
+  const pyodideRef = useRef<PyodideInstance | null>(null)
 
   useEffect(() => {
     const loadPyodideScript = async () => {
@@ -30,7 +39,9 @@ export function usePyodide() {
         script.async = true
         script.onload = async () => {
           try {
-            const pyodideInstance = await window.loadPyodide({
+            const loadPyodide = window.loadPyodide
+            if (!loadPyodide) throw new Error('Python runtime loaded without its initializer.')
+            const pyodideInstance = await loadPyodide({
               indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/'
             })
             pyodideRef.current = pyodideInstance
@@ -135,16 +146,18 @@ final_stderr = custom_err.get_output()
         pyodide.globals.delete('__browser_prompt__')
       }
 
-      const stdout = pyodide.globals.get('final_stdout') || ''
-      const stderr = pyodide.globals.get('final_stderr') || ''
+      const stdoutValue = pyodide.globals.get('final_stdout')
+      const stderrValue = pyodide.globals.get('final_stderr')
+      const stdout = typeof stdoutValue === 'string' ? stdoutValue : ''
+      const stderr = typeof stderrValue === 'string' ? stderrValue : ''
       const executionTime = Number(((performance.now() - startTime) / 1000).toFixed(3))
 
       return { stdout, stderr, executionTime }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const executionTime = Number(((performance.now() - startTime) / 1000).toFixed(3))
       return {
         stdout: '',
-        stderr: err.message || 'Execution error in Python runtime.',
+        stderr: err instanceof Error ? err.message : 'Execution error in Python runtime.',
         executionTime
       }
     }
