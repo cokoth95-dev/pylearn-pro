@@ -23,11 +23,11 @@ type Lesson = {
   content_markdown: string
   starter_code: string
   hints: string[] | null
-  quick_check: { question?: string; options?: string[] }
+  quick_check: { question?: string; options?: string[]; questions?: Array<{ question: string; options: string[] }> }
   modules: { id: number; title: string; month_number: number; order_index: number; course_id: string; status: string }
 }
 type PracticeFile = { sessionId: number; title: string; monthNumber: number; weekNumber: number; sessionNumber: number }
-type QuickCheckAttempt = { selected_option: number; correct: boolean; attempted_at: string }
+type QuickCheckAttempt = { question_number: number; selected_option: number; correct: boolean; attempted_at: string }
 type QuickCheckResult = { correct: boolean; explanation: string; session_completed_now: boolean; xp_awarded: number }
 type Tab = 'inputHelp' | 'terminal' | 'visualizer' | 'ai'
 
@@ -114,8 +114,10 @@ function ClassroomContent() {
   const [isEditorFullscreen, setIsEditorFullscreen] = useState(false)
   const [wrapEditorLines, setWrapEditorLines] = useState(false)
   const [attempts, setAttempts] = useState<QuickCheckAttempt[]>([])
-  const [selectedOption, setSelectedOption] = useState<number | null>(null)
-  const [checkResult, setCheckResult] = useState<QuickCheckResult | null>(null)
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, number>>({})
+  const [checkResults, setCheckResults] = useState<Record<number, QuickCheckResult>>({})
+  const [activeQuestion, setActiveQuestion] = useState(0)
+  const [alreadyCompleted, setAlreadyCompleted] = useState(false)
   const [isSubmittingCheck, setIsSubmittingCheck] = useState(false)
   const [saveState, setSaveState] = useState<'loading' | 'saved' | 'saving' | 'error'>('loading')
   const [secondsSpent, setSecondsSpent] = useState(0)
@@ -206,7 +208,7 @@ function ClassroomContent() {
           .select('draft_code,completed,timer_seconds_spent').eq('student_id', user.id).eq('session_id', sessionId).maybeSingle()
         if (progressError) throw progressError
         const { data: history, error: historyError } = await supabase.from('session_quick_check_attempts')
-          .select('selected_option,correct,attempted_at').eq('student_id', user.id).eq('session_id', sessionId).order('attempted_at')
+          .select('question_number,selected_option,correct,attempted_at').eq('student_id', user.id).eq('session_id', sessionId).order('attempted_at')
         if (historyError) throw historyError
         const { data: courseSessions, error: sessionsError } = await supabase.from('sessions')
           .select('id,session_number').eq('module_id', loaded.module_id).order('session_number')
@@ -241,9 +243,14 @@ function ClassroomContent() {
         setCode(draft); setSavedCode(draft); setSaveState('saved')
         setSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
         setSavedSecondsSpent(progressRow?.timer_seconds_spent ?? 0)
+        setSelectedOptions({})
+        setCheckResults({})
         setAttempts((history ?? []) as QuickCheckAttempt[])
-        const lastCorrect = [...((history ?? []) as QuickCheckAttempt[])].reverse().find((attempt) => attempt.correct)
-        if (lastCorrect) setCheckResult({ correct: true, explanation: 'You already passed this quick check. Your completion is saved.', session_completed_now: false, xp_awarded: 0 })
+        setAlreadyCompleted(Boolean(progressRow?.completed))
+        const passedQuestions = new Set(((history ?? []) as QuickCheckAttempt[]).filter((attempt) => attempt.correct).map((attempt) => attempt.question_number))
+        const questions = loaded.quick_check?.questions ?? (loaded.quick_check?.question ? [{ question: loaded.quick_check.question, options: loaded.quick_check.options ?? [] }] : [])
+        const nextQuestion = questions.findIndex((_, index) => !passedQuestions.has(index + 1))
+        setActiveQuestion(nextQuestion < 0 ? Math.max(0, questions.length - 1) : nextQuestion)
         setNextLessonId(currentIndex >= 0 ? courseSessions?.[currentIndex + 1]?.id ?? null : null)
       } catch (error) {
         if (active) setLoadError(error instanceof Error ? error.message : 'We could not load this lesson.')
@@ -292,24 +299,36 @@ function ClassroomContent() {
   }, [lesson])
 
   async function submitQuickCheck() {
-    if (!lesson || selectedOption === null || isSubmittingCheck) return
-    setIsSubmittingCheck(true); setCheckResult(null)
+    const questionNumber = activeQuestion + 1
+    const selectedOption = selectedOptions[questionNumber]
+    if (!lesson || selectedOption === undefined || isSubmittingCheck) return
+    setIsSubmittingCheck(true)
     const { data, error } = await supabase.rpc('submit_session_quick_check', {
-      p_session_id: lesson.id, p_selected_option: selectedOption,
+      p_session_id: lesson.id, p_question_number: questionNumber, p_selected_option: selectedOption,
     })
     if (error) {
-      setCheckResult({ correct: false, explanation: error.message, session_completed_now: false, xp_awarded: 0 })
+      setCheckResults((current) => ({ ...current, [questionNumber]: { correct: false, explanation: error.message, session_completed_now: false, xp_awarded: 0 } }))
     } else {
       const result = data as QuickCheckResult
-      setCheckResult(result)
-      setAttempts((current) => [...current, { selected_option: selectedOption, correct: result.correct, attempted_at: new Date().toISOString() }])
+      setCheckResults((current) => ({ ...current, [questionNumber]: result }))
+      setAttempts((current) => [...current, { question_number: questionNumber, selected_option: selectedOption, correct: result.correct, attempted_at: new Date().toISOString() }])
+      if (result.correct) {
+        const passed = new Set(attempts.filter((attempt) => attempt.correct).map((attempt) => attempt.question_number))
+        passed.add(questionNumber)
+        const next = checkQuestions.findIndex((_, index) => index + 1 > questionNumber && !passed.has(index + 1))
+        if (next >= 0) setActiveQuestion(next)
+      }
     }
     setIsSubmittingCheck(false)
   }
 
-  const checkOptions = lesson?.quick_check?.options ?? []
-  const latestAttempt = attempts.at(-1)
-  const completed = Boolean(checkResult?.correct || attempts.some((attempt) => attempt.correct))
+  const checkQuestions = lesson?.quick_check?.questions ?? (lesson?.quick_check?.question ? [{ question: lesson.quick_check.question, options: lesson.quick_check.options ?? [] }] : [])
+  const correctQuestionNumbers = new Set(attempts.filter((attempt) => attempt.correct).map((attempt) => attempt.question_number))
+  const currentQuestionNumber = activeQuestion + 1
+  const currentQuestion = checkQuestions[activeQuestion]
+  const currentResult = checkResults[currentQuestionNumber]
+  const currentAttempts = attempts.filter((attempt) => attempt.question_number === currentQuestionNumber)
+  const completed = alreadyCompleted || (checkQuestions.length > 0 && correctQuestionNumbers.size >= checkQuestions.length)
 
   if (loading) return <main className="min-h-screen p-8 text-center text-stone-700">Loading your lesson…</main>
   if (loadError || !lesson) return <main className="mx-auto min-h-screen max-w-2xl p-8 text-stone-800"><p role="alert" className="mb-4 rounded-xl border border-rose-300 bg-rose-50 p-4">{loadError || 'Lesson unavailable.'}</p><Link className="underline" href="/dashboard">Back to Dashboard</Link></main>
@@ -354,10 +373,12 @@ function ClassroomContent() {
         <div className="flex-1 overflow-auto p-3">
           {tab === 'inputHelp' && <section role="tabpanel" className="flex min-h-[320px] flex-col gap-3 rounded-xl border border-white/10 bg-slate-900/50 p-4"><div><h2 className="font-bold text-slate-100">How <code className="font-mono text-emerald-300">input()</code> works</h2><p className="mt-2 text-sm leading-6 text-slate-300"><code className="font-mono text-emerald-300">input()</code> lets a program ask you a question and use your reply. Click Run code. When Python reaches an <code className="font-mono text-emerald-300">input()</code> line, your browser opens a small dialog showing the question. Type your answer and choose OK. If the program asks another question, a new dialog appears.</p></div><div className="rounded-lg border border-white/10 bg-slate-950 p-3"><p className="text-sm font-semibold text-slate-200">Example</p><pre className="mt-2 whitespace-pre-wrap font-mono text-xs leading-5 text-slate-300">{`name = input("What is your name? ")\nprint(f"Hello, {name}!")`}</pre></div><p className="text-sm leading-6 text-slate-300">After you answer, the program continues. Its questions, your replies, and anything it prints appear in the Output tab. The browser dialog is separate from the Output tab. Choosing Cancel stops the program; submitting an empty answer is allowed.</p><p className="text-xs leading-5 text-slate-400">An answer is text, even when you type digits. To use it in a calculation, convert it with <code className="font-mono text-emerald-300">int(input(...))</code>.</p></section>}
           {tab === 'terminal' && <>{terminalError && <div className="mb-2 rounded-xl border border-amber-300/30 bg-amber-100 p-3 text-sm text-amber-950" role="status"><strong className="block">Let’s fix this</strong>{terminalError}<div><button className="mt-1 underline" onClick={() => setShowTraceback((value) => !value)}>{showTraceback ? 'Hide full traceback' : 'Show full traceback'}</button></div>{showTraceback && <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border-t border-amber-300 pt-2 font-mono text-xs">{fullTraceback}</pre>}</div>}<pre className="max-h-56 min-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-white/10 bg-slate-950 p-3 font-mono text-xs leading-5 text-slate-100">{terminalOutput}</pre>
-            <div className="mt-5 rounded-xl border border-emerald-300/30 bg-emerald-50 p-4 text-stone-900"><div className="font-bold">Quick check · {attempts.length} attempt{attempts.length === 1 ? '' : 's'}</div><p className="mt-2 text-sm">{lesson.quick_check?.question ?? 'No quick check is available for this lesson.'}</p><div className="mt-3 space-y-2">{checkOptions.map((option, index) => <button key={index} disabled={completed || isSubmittingCheck} onClick={() => setSelectedOption(index)} className={`block w-full rounded-lg border p-2.5 text-left text-sm disabled:cursor-not-allowed ${selectedOption === index ? 'border-emerald-700 bg-emerald-100' : 'border-stone-300 bg-white hover:bg-stone-50'}`}><span className="mr-2 font-bold">{String.fromCharCode(65 + index)}.</span>{option}</button>)}</div>
-              {checkResult && <div role="status" className={`mt-3 rounded-lg p-3 text-sm ${checkResult.correct ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>{checkResult.correct ? 'Correct — lesson complete. ' : 'Not quite. Try again. '}{checkResult.explanation}{checkResult.xp_awarded > 0 ? ` You earned ${checkResult.xp_awarded} XP.` : ''}</div>}
-              {latestAttempt && !checkResult?.correct && <p className="mt-2 text-xs text-stone-600">Your attempts are saved. There is no penalty for trying again.</p>}
-              <button disabled={selectedOption === null || completed || isSubmittingCheck || !checkOptions.length} onClick={submitQuickCheck} className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{isSubmittingCheck ? 'Checking…' : 'Submit answer'} <Send className="ml-1 inline h-3.5 w-3.5"/></button>
+            <div className="mt-5 rounded-xl border border-emerald-300/30 bg-emerald-50 p-4 text-stone-900"><div className="font-bold">Quick check · {completed ? 'Complete' : `${correctQuestionNumbers.size} of ${checkQuestions.length} correct`} · {attempts.length} attempt{attempts.length === 1 ? '' : 's'}</div>
+              {completed ? <p className="mt-2 text-sm">You passed this lesson’s check. Your progress is saved.</p> : currentQuestion ? <><p className="mt-2 text-xs font-semibold text-stone-600">Question {currentQuestionNumber} of {checkQuestions.length}{checkQuestions.length === 4 && currentQuestionNumber === 4 ? ' · Challenge question' : ''}</p><p className="mt-1 text-sm">{currentQuestion.question}</p><div className="mt-3 space-y-2">{currentQuestion.options.map((option, index) => <button key={index} disabled={correctQuestionNumbers.has(currentQuestionNumber) || isSubmittingCheck} onClick={() => setSelectedOptions((current) => ({ ...current, [currentQuestionNumber]: index }))} className={`block w-full rounded-lg border p-2.5 text-left text-sm disabled:cursor-not-allowed ${selectedOptions[currentQuestionNumber] === index ? 'border-emerald-700 bg-emerald-100' : 'border-stone-300 bg-white hover:bg-stone-50'}`}><span className="mr-2 font-bold">{String.fromCharCode(65 + index)}.</span>{option}</button>)}</div>
+                {currentResult && <div role="status" className={`mt-3 rounded-lg p-3 text-sm ${currentResult.correct ? 'bg-emerald-100 text-emerald-950' : 'bg-amber-100 text-amber-950'}`}>{currentResult.correct ? 'Correct. ' : 'Not quite. Try again. '}{currentResult.explanation}{currentResult.xp_awarded > 0 ? ` You earned ${currentResult.xp_awarded} XP.` : ''}</div>}
+                {currentAttempts.length > 0 && !currentResult?.correct && <p className="mt-2 text-xs text-stone-600">Your attempts are saved. There is no penalty for trying again.</p>}
+                {!correctQuestionNumbers.has(currentQuestionNumber) && <button disabled={selectedOptions[currentQuestionNumber] === undefined || isSubmittingCheck} onClick={submitQuickCheck} className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-40">{isSubmittingCheck ? 'Checking…' : 'Submit answer'} <Send className="ml-1 inline h-3.5 w-3.5"/></button>}
+              </> : <p className="mt-2 text-sm">No quick check is available for this lesson.</p>}
               {completed && nextLessonId && <Link href={`/classroom/${nextLessonId}`} className="ml-3 inline-flex items-center rounded-lg border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900">Next lesson <ChevronRight className="h-4 w-4"/></Link>}{completed && !nextLessonId && <Link href="/dashboard" className="ml-3 inline-flex items-center rounded-lg border border-emerald-700 px-3 py-2 text-sm font-semibold text-emerald-900">Week complete <CheckCircle2 className="ml-1 h-4 w-4"/></Link>}
             </div>
             <p className="mt-3 flex items-center gap-1 text-[11px] text-slate-400"><Clock className="h-3 w-3"/>Time in this lesson: {Math.floor(secondsSpent / 60)} min</p>

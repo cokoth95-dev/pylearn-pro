@@ -53,8 +53,9 @@ export interface Session {
 }
 
 export interface QuickCheck {
-  question: string
-  options: string[]
+  question?: string
+  options?: string[]
+  questions?: Array<{ question: string; options: string[] }>
 }
 
 export interface Assignment {
@@ -112,6 +113,7 @@ export interface QuickCheckAttempt {
   id: string
   student_id: string
   session_id: number
+  question_number: number
   selected_option: number
   correct: boolean
   content_snapshot: Json
