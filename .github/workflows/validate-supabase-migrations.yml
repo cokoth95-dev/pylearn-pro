@@ -1,0 +1,42 @@
+name: Validate Supabase migrations
+
+on:
+  pull_request:
+    paths:
+      - 'web/supabase/**'
+      - '.github/workflows/validate-supabase-migrations.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/supabase/**'
+      - '.github/workflows/validate-supabase-migrations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  database:
+    name: Apply and lint local database
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.121.0
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Apply every migration to a clean database
+        run: supabase db reset --local
+
+      - name: Lint the migrated database
+        run: supabase db lint --local --level error --fail-on error
