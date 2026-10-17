@@ -53,6 +53,20 @@
   background-color: #3d2e13 !important;
 }
 
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-50"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-50/60"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-emerald-100"] {
+  background-color: #12352d !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-rose-50"] {
+  background-color: #3b2026 !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="bg-stone-100"] {
+  background-color: #242b33 !important;
+}
+
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-900"],
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-800"],
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-stone-700"],
@@ -68,10 +82,38 @@
   color: #f5d68a !important;
 }
 
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-700"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-800"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-900"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-emerald-950"] {
+  color: #86efc2 !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-700"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-900"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-amber-300"] {
+  color: #fcd982 !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-rose-800"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="text-rose-900"] {
+  color: #fda4af !important;
+}
+
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-100"],
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-200"],
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-stone-300"] {
   border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-emerald-200"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-emerald-600"] {
+  border-color: rgba(52, 211, 153, 0.38) !important;
+}
+
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-rose-200"],
+:root[data-theme="dark"] :is(.admin-console, .instructor-console) [class~="border-rose-300"] {
+  border-color: rgba(251, 113, 133, 0.4) !important;
 }
 
 :root[data-theme="dark"] :is(.admin-console, .instructor-console) input,
@@ -288,6 +330,53 @@
 
 :root[data-theme="light"] .memory-visualizer .memory-inspector-copy .text-amber-400 {
   color: #a16207 !important;
+}
+
+/* Lesson copy is rendered as real Markdown in the authoring previews and uses
+   theme-aware colors for prose while keeping Python snippets legible in both themes. */
+.lesson-markdown {
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.lesson-markdown.compact {
+  font-size: 0.8125rem;
+  line-height: 1.65;
+}
+
+.lesson-markdown > * + * { margin-top: 0.8rem; }
+.lesson-markdown.compact > * + * { margin-top: 0.55rem; }
+.lesson-markdown p { margin-bottom: 0; }
+.lesson-markdown strong { font-weight: 700; }
+.lesson-markdown-heading { color: var(--foreground); font-weight: 750; line-height: 1.35; }
+.lesson-markdown h2.lesson-markdown-heading { margin-top: 1.25rem; font-size: 1.2rem; }
+.lesson-markdown h3.lesson-markdown-heading { margin-top: 1rem; font-size: 1.05rem; }
+.lesson-markdown h4.lesson-markdown-heading { margin-top: 0.85rem; font-size: 0.95rem; }
+.lesson-markdown-list { list-style: disc; padding-left: 1.4rem; }
+.lesson-markdown-list.ordered { list-style: decimal; }
+.lesson-markdown-list li { padding-left: 0.15rem; }
+.lesson-markdown-list li + li { margin-top: 0.25rem; }
+.lesson-inline-code { border: 1px solid #eadbb5; border-radius: 0.3rem; background: #fff3cd; padding: 0.08rem 0.3rem; color: #713f12; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+.lesson-code-block { overflow-x: auto; border: 1px solid #30363d; border-radius: 0.7rem; background: #171a1f; padding: 0.85rem 1rem; color: #f0f6fc; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; line-height: 1.65; tab-size: 4; }
+.lesson-markdown-quote { border-left: 3px solid #10b981; border-radius: 0 0.5rem 0.5rem 0; background: color-mix(in srgb, var(--surface-muted) 75%, transparent); padding: 0.65rem 0.85rem; }
+.lesson-markdown-quote p + p { margin-top: 0.45rem; }
+
+:root[data-theme="dark"] .lesson-inline-code {
+  border-color: #675322;
+  background: #342b17;
+  color: #f8d77a;
+}
+
+/* The teaching guide is a colored callout, so its surface and accent text need
+   a matching dark palette instead of inheriting a light mint/green combination. */
+:root[data-theme="dark"] .instructor-console .lesson-guide-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #20262e;
+}
+:root[data-theme="dark"] .instructor-console .lesson-guide .lesson-guide-card {
+  color: #e6edf3;
 }
 
 .pill-card {
