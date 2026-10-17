@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { LogOut, UserRound } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import NotificationBell from '@/components/notifications/NotificationBell'
 
 export default function AccountMenu({ dark = false }: { dark?: boolean }) {
   const supabase = useMemo(() => createClient(), [])
@@ -40,7 +41,7 @@ export default function AccountMenu({ dark = false }: { dark?: boolean }) {
     window.location.assign('/')
   }
 
-  return <details className="relative">
+  return <div className="flex items-center gap-1"><NotificationBell dark={dark}/><details className="relative">
     <summary aria-label="Open profile and account actions" title="Profile and account" className={summaryClass}>{initials}</summary>
     <div className={`absolute right-0 z-50 mt-2 w-64 rounded-2xl border p-3 shadow-xl ${dark ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-stone-200 bg-white text-stone-900'}`}>
       <p className="truncate px-2 pt-1 text-sm font-semibold">{name || 'My account'}</p>
@@ -49,5 +50,5 @@ export default function AccountMenu({ dark = false }: { dark?: boolean }) {
       <button type="button" onClick={() => void signOut()} disabled={busy} className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm disabled:opacity-50 ${dark ? 'text-rose-300 hover:bg-slate-800' : 'text-rose-700 hover:bg-rose-50'}`}><LogOut className="h-4 w-4"/>{busy ? 'Signing out…' : 'Sign out'}</button>
       {error && <p role="alert" className="px-2 pt-2 text-xs text-rose-600">{error}</p>}
     </div>
-  </details>
+  </details></div>
 }
