@@ -14,6 +14,7 @@ type LessonDraft = { session_number: number; title: string; analogy: string; con
 type LessonAnswer = { correctOption: number; explanation: string }
 type Person = { id: string; full_name: string; email: string; age: number | null; xp: number; role: 'student' | 'instructor' | 'admin'; created_at: string }
 type CourseInstructor = { course_id: string; instructor_id: string }
+type StudentInstructor = { course_id: string; student_id: string; instructor_id: string }
 type LearnerProgress = { student_id: string; session_id: number; completed: boolean; completed_at: string | null; timer_seconds_spent: number; last_accessed: string }
 type LearnerAttempt = { student_id: string; session_id: number; correct: boolean; attempted_at: string }
 type CourseEnrollment = { course_id: string; student_id: string; plan: string; status: string; started_at: string; paid_through: string | null }
@@ -51,6 +52,9 @@ export default function AdminPage() {
   const [selectedLearnerId, setSelectedLearnerId] = useState('')
   const [learnerSearch, setLearnerSearch] = useState('')
   const [courseInstructors, setCourseInstructors] = useState<CourseInstructor[]>([])
+  const [studentInstructors, setStudentInstructors] = useState<StudentInstructor[]>([])
+  const [selectedAssignedStudent, setSelectedAssignedStudent] = useState('')
+  const [selectedAssignedInstructor, setSelectedAssignedInstructor] = useState('')
   const [heroSettings, setHeroSettings] = useState<SiteSettings>({ hero_image_url: null, hero_image_opacity: 28, hero_media_type: 'image' })
   const [heroUrlDraft, setHeroUrlDraft] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null)
@@ -76,12 +80,13 @@ export default function AdminPage() {
     if (profileError) throw profileError
     if (profile?.role !== 'admin') { setAccess('denied'); return }
 
-    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult] = await Promise.all([
+    const [courseResult, moduleResult, sessionResult, personResult, instructorResult, studentInstructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult] = await Promise.all([
       supabase.from('courses').select('id,slug,title,language_code,description,status').order('created_at'),
       supabase.from('modules').select('id,course_id,month_number,title,tagline,description,is_free,order_index,status').order('course_id').order('month_number').order('order_index'),
       supabase.from('sessions').select('id,module_id,session_number,title,analogy_physical,content_markdown,starter_code,hints,xp_reward,duration_minutes,quick_check').order('module_id').order('session_number'),
       supabase.rpc('admin_list_people'),
       supabase.from('course_instructors').select('course_id,instructor_id'),
+      supabase.from('student_instructors').select('course_id,student_id,instructor_id'),
       supabase.from('user_progress').select('student_id,session_id,completed,completed_at,timer_seconds_spent,last_accessed').order('last_accessed', { ascending: false }),
       supabase.from('session_quick_check_attempts').select('student_id,session_id,correct,attempted_at').order('attempted_at', { ascending: false }),
       supabase.from('course_enrollments').select('course_id,student_id,plan,status,started_at,paid_through').order('started_at', { ascending: false }),
@@ -91,7 +96,7 @@ export default function AdminPage() {
       supabase.from('admission_document_versions').select('version,title,content_markdown,requires_reacceptance,published_at').order('version', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('admission_document_draft').select('title,content_markdown').eq('id', true).maybeSingle(),
     ])
-    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult]) {
+    for (const result of [courseResult, moduleResult, sessionResult, personResult, instructorResult, studentInstructorResult, learnerProgressResult, learnerAttemptsResult, enrollmentResult, siteSettingsResult, paymentSettingsResult, paymentRequestsResult, admissionResult, admissionDraftResult]) {
       if (result.error) throw result.error
     }
     setCourses((courseResult.data ?? []) as Course[])
@@ -103,6 +108,7 @@ export default function AdminPage() {
     setCourseEnrollments((enrollmentResult.data ?? []) as CourseEnrollment[])
     setSelectedLearnerId((current) => current || (personResult.data as Person[] | null)?.find((person) => person.role === 'student')?.id || '')
     setCourseInstructors((instructorResult.data ?? []) as CourseInstructor[])
+    setStudentInstructors((studentInstructorResult.data ?? []) as StudentInstructor[])
     if (siteSettingsResult.data) {
       const settings = siteSettingsResult.data as SiteSettings
       setHeroSettings(settings)
@@ -206,6 +212,19 @@ export default function AdminPage() {
       p_course_id: courseId,
       p_profile_id: profileId,
     }), 'Course assignment removed. The person keeps their instructor role.')
+  }
+
+  async function assignStudentInstructor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedCourse || !selectedAssignedStudent || !selectedAssignedInstructor) return
+    const saved = await perform(async () => await supabase.rpc('admin_assign_student_instructor', {
+      p_course_id: selectedCourse, p_student_id: selectedAssignedStudent, p_instructor_id: selectedAssignedInstructor,
+    }), 'Learner assigned to instructor.')
+    if (saved) { setSelectedAssignedStudent(''); setSelectedAssignedInstructor('') }
+  }
+
+  async function removeStudentInstructor(courseId: string, studentId: string) {
+    await perform(async () => await supabase.rpc('admin_remove_student_instructor', { p_course_id: courseId, p_student_id: studentId }), 'Learner instructor assignment removed.')
   }
 
   async function saveLesson(moduleId: number, sessionId: number | null, draft: LessonDraft) {
@@ -460,6 +479,7 @@ export default function AdminPage() {
           <label className="block max-w-xl text-xs font-semibold text-stone-600">Course<select className={`${inputClass} mt-1`} value={selectedCourse} onChange={(event) => setSelectedCourse(event.target.value)}>{courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}</select></label>
           <form onSubmit={assignInstructor} className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm md:flex-row"><select required className={inputClass} value={selectedInstructor} onChange={(event) => setSelectedInstructor(event.target.value)}><option value="">Choose a learner or instructor</option>{people.filter((person) => person.role !== 'admin').map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.role} · {person.id.slice(0, 6)}</option>)}</select><button disabled={busy || !selectedCourse} className={`${buttonClass} shrink-0`}><Users className="h-4 w-4"/>Promote and assign</button></form>
           <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><h3 className="font-bold">Assigned to {selectedCourseRow?.title ?? 'course'}</h3><div className="mt-3 divide-y divide-stone-100">{courseInstructors.filter((assignment) => assignment.course_id === selectedCourse).map((assignment) => { const person = people.find((item) => item.id === assignment.instructor_id); return <div key={assignment.instructor_id} className="flex items-center justify-between gap-3 py-3"><div><p className="font-semibold">{person?.full_name ?? 'Instructor'}</p><p className="text-xs text-stone-500">Instructor · {assignment.instructor_id.slice(0, 8)}…</p></div><button disabled={busy} onClick={() => void removeInstructor(assignment.course_id, assignment.instructor_id)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">Remove course assignment</button></div>})}{!courseInstructors.some((assignment) => assignment.course_id === selectedCourse) && <p className="py-3 text-sm text-stone-500">No instructors are assigned to this course yet.</p>}</div></section>
+          <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div><h3 className="font-bold">Assign learners to an instructor</h3><p className="mt-1 text-sm leading-5 text-stone-600">The learner must have active course access, and the instructor must already be assigned to the course. Learners appear in the instructor’s progress view after assignment.</p></div><form onSubmit={assignStudentInstructor} className="grid gap-3 md:grid-cols-3"><select required className={inputClass} value={selectedAssignedStudent} onChange={(event) => setSelectedAssignedStudent(event.target.value)}><option value="">Choose active learner</option>{people.filter((person) => person.role === 'student' && courseEnrollments.some((enrollment) => enrollment.course_id === selectedCourse && enrollment.student_id === person.id && enrollment.status === 'active')).map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}</select><select required className={inputClass} value={selectedAssignedInstructor} onChange={(event) => setSelectedAssignedInstructor(event.target.value)}><option value="">Choose course instructor</option>{courseInstructors.filter((item) => item.course_id === selectedCourse).map((item) => { const person = people.find((entry) => entry.id === item.instructor_id); return <option key={item.instructor_id} value={item.instructor_id}>{person?.full_name ?? 'Instructor'}</option> })}</select><button disabled={busy || !selectedCourse} className={buttonClass}><Users className="h-4 w-4"/>Assign learner</button></form><div className="divide-y divide-stone-100">{studentInstructors.filter((item) => item.course_id === selectedCourse).map((item) => <div key={item.student_id} className="flex flex-wrap items-center justify-between gap-3 py-3"><p className="text-sm"><strong>{people.find((person) => person.id === item.student_id)?.full_name ?? 'Learner'}</strong><span className="text-stone-500"> is assigned to </span><strong>{people.find((person) => person.id === item.instructor_id)?.full_name ?? 'Instructor'}</strong></p><button disabled={busy} onClick={() => void removeStudentInstructor(item.course_id, item.student_id)} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-700">Remove learner assignment</button></div>)}{!studentInstructors.some((item) => item.course_id === selectedCourse) && <p className="text-sm text-stone-500">No individual learner assignments yet.</p>}</div></section>
         </>}
 
         {view === 'hero' && <>

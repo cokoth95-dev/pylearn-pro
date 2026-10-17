@@ -1,7 +1,8 @@
 ﻿"use client"
 
 import React, { useState } from 'react'
-import { Sparkles, Send, Bot, User, HelpCircle } from 'lucide-react'
+import { Sparkles, Send, Bot, User } from 'lucide-react'
+import ChatMarkdown from './ChatMarkdown'
 
 interface Message {
   role: 'user' | 'ai'
@@ -94,13 +95,13 @@ export default function AIChatMentor({
               </div>
             )}
             <div
-              className={`p-2.5 rounded-xl max-w-[85%] whitespace-pre-wrap break-words leading-relaxed ${
+              className={`p-3 rounded-xl max-w-[92%] break-words leading-relaxed ${
                 m.role === 'user'
                   ? 'bg-emerald-500/20 border border-emerald-500/30 text-white rounded-br-none'
                   : 'bg-slate-900 border border-white/5 text-slate-200 rounded-bl-none'
               }`}
             >
-              {m.content}
+              {m.role === 'ai' ? <ChatMarkdown content={m.content}/> : <p className="whitespace-pre-wrap">{m.content}</p>}
               {m.provider && <div className="mt-2 border-t border-white/10 pt-1 text-[10px] text-slate-400">Answered by {m.provider}{m.fallback ? ' after the first provider was unavailable' : ''}.</div>}
             </div>
             {m.role === 'user' && (
